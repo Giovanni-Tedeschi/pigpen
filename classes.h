@@ -18,8 +18,9 @@ class Cell{
             // GAS
             U[0] = W[0];                                               
             U[1] = W[0] * W[1];        
-            U[2] = (0.5 * W[0] * W[1] * W[1] + W[2] / (GAMMA-1.));    
+            U[2] = 0.5 * W[0] * W[1] * W[1] + W[2] / (GAMMA-1.);    
             // DUST
+            U[2] += 0.5 * W[3] * W[4] * W[4];
             U[3] = W[3];
             U[4] = W[3] * W[4];                                
         }
@@ -32,6 +33,7 @@ class Cell{
             // DUST
             W[3] = U[3];
             W[4] = U[4] / U[3];
+            W[2] -= (0.5 * W[3] * W[4] * W[4])* (GAMMA-1.);
         }
 
         void get_F(){
@@ -42,6 +44,7 @@ class Cell{
             // DUST
             F[3] = W[3]*W[4];
             F[4] = W[3]*W[4]*W[4];
+            F[2] += W[4] * (0.5 * W[3] * W[4] * W[4]);
         }
 
         double get_SoundSpeed2(){
@@ -49,7 +52,7 @@ class Cell{
         }
 
         double get_vsig(){
-            return fabs(W[1]) + sqrt(get_SoundSpeed2());
+            return fabs(W[1]) + sqrt(get_SoundSpeed2()) + fabs(W[4]);
         }
 };
 

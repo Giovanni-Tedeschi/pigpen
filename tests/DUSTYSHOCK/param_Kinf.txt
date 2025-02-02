@@ -1,0 +1,16 @@
+# Mandatory variables
+t_max:                  0.2                # Maximum time
+dt_snap:                0.01               # Time interval of snapshots
+GAMMA:                  1.66666            # Adiabatic index
+BoundaryCondition:      0                  # Boundary condition: 0 -> Transmissive | 1 -> Periodic
+input_file:             shock_Kinf.inp     # Name of the initial condition file 
+output_dir:             output/Kinf/       # Output directory
+DustSpecies:            1                  # Number of dust species (for now only 0 or 1)
+K:                      1000               # Drag Coefficient
+
+
+# Optional variables
+#N_dims:                 1                  # Number of dimensions (for radially symmetric shocks)
+#L:                      1                  # Lenght of the domain (defaul: 1)
+RiemannSolver:          0                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
+#CFL:                    0.1                # Courant number (default 0.1)

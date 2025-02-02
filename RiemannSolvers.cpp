@@ -10,11 +10,13 @@ void get_dust_flux(Cell &Left, Cell &Right)
     double vel_dR = Right.W[4];
     if ((vel_dL >= 0.) && (vel_dR >= 0.))
     {
+        Left.FR[2] += 0.5 * rho_dL * pow(vel_dL,3);
         Left.FR[3] = rho_dL * vel_dL;
         Left.FR[4] = rho_dL * pow(vel_dL, 2);
     }
     else if ((vel_dL <= 0.) && (vel_dR <= 0.))
     {
+        Left.FR[2] += 0.5 * rho_dR * pow(vel_dR,3);
         Left.FR[3] = rho_dR * vel_dR;
         Left.FR[4] = rho_dR * pow(vel_dR, 2);
     }
@@ -25,10 +27,11 @@ void get_dust_flux(Cell &Left, Cell &Right)
     }
     else if ((vel_dL >= 0.) && (vel_dR <= 0.))
     {
+        Left.FR[2] += 0.5 * rho_dL * pow(vel_dL,3) +  0.5 * rho_dR * pow(vel_dR,3);
         Left.FR[3] = rho_dL * vel_dL + rho_dR * vel_dR;
         Left.FR[4] = rho_dL * pow(vel_dL, 2) + rho_dR * pow(vel_dR, 2);
     }
-    for (int j = 3; j < 5; j++)
+    for (int j = 2; j < 5; j++)
         Right.FL[j] = Left.FR[j];
 }
 

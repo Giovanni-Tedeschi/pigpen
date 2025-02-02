@@ -86,15 +86,29 @@ void integrate_drag(std::vector<Cell> &c, Params p, Vars v)
     }
 
     double drag;
-    // if(v.dt < ts){
-    for (int i = 0; i < p.N_cells; i++)
-    {
-        drag = -p.K * v.dt * (c[i].W[4] - c[i].W[1]);
-        c[i].U[1] -= drag;
-        c[i].U[4] += drag;
-        c[i].get_W_from_U();
+    if(v.dt < ts){
+        for (int i = 0; i < p.N_cells; i++)
+        {
+            drag = -p.K * v.dt * (c[i].W[4] - c[i].W[1]);
+            c[i].U[1] -= drag;
+            c[i].U[4] += drag;
+            c[i].get_W_from_U();
+        }
+    }else{
+        int M = 1;
+        do{
+          M += 1;
+        }while(v.dt/M > ts);
+
+        for(int iM=0; iM<M; iM++){
+          for(int i=0; i<p.N_cells; i++){
+            drag = -p.K * v.dt * (c[i].W[4] - c[i].W[1]);
+            c[i].U[1] -= drag;
+            c[i].U[4] += drag;
+            c[i].get_W_from_U();
+          }
+        }
     }
-    //}
 }
 
 void find_dt(std::vector<Cell> c, Params p, Vars &v)
