@@ -125,7 +125,6 @@ void find_dt(std::vector<Cell> c, Params p, Vars &v)
 
 int main(int argc, char *argv[])
 {
-
     // Read the param file name as terminal input
     std::string param_file = argv[1];
 
@@ -137,7 +136,6 @@ int main(int argc, char *argv[])
 
     while (v.t < p.t_max)
     {
-
         compute_fluxes(c, p);
 
         find_dt(c, p, v);
