@@ -1,0 +1,21 @@
+# Mandatory variables
+t_max:                  0.3                # Maximum time
+dt_snap:                0.01                # Time interval of snapshots
+GAMMA:                  1.4                # Adiabatic index
+BoundaryCondition:      1                  # Boundary condition: 0 -> Transmissive | 1 -> Periodic
+input_file:             box_C.inp            # Name of the initial condition file 
+output_dir:             output_C/DHD/            # Output directory
+DustSpecies:            2                  # Number of dust species (for now only 0 or 1)
+K_1:                    5                  # Drag Coefficient
+K_2:                    100                  # Drag Coefficient
+DragIntegrator:         1                  # Drag integrator: 1 -> DHD; 2 -> DHDHD; 3 -> MDIRK
+
+
+# Optional variables
+#N_dims:                 1                  # Number of dimensions (for radially symmetric shocks)
+#L:                      1                  # Lenght of the domain (defaul: 1)
+#RiemannSolver:          1                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
+#CFL:                    0.1                # Courant number (default 0.1)
+#dt: 1e-4
+
+

@@ -40,9 +40,14 @@ Params read_param(std::string fname)
     p.t_max = stof(configData["t_max"]);
     p.dt_snap = stof(configData["dt_snap"]);
     p.BC = stoi(configData["BoundaryCondition"]);
+    p.DragIntegrator = stoi(configData["DragIntegrator"]);
     p.N_dust = stoi(configData["DustSpecies"]);
     p.N_vars = 3 + 2 * p.N_dust;
-    p.K = stof(configData["K"]);
+    p.K.resize(p.N_dust);
+    for(int j = 1; j<=p.N_dust; j++){
+        p.K[j-1] = stof(configData["K_" + std::to_string(j)]);
+    }
+
     p.input_file = configData["input_file"];
     p.input_file.erase(std::remove_if(p.input_file.begin(), p.input_file.end(), [](char c)
                                       { return c == '\n' || c == '\r'; }),
@@ -85,25 +90,27 @@ std::vector<Cell> read_ic(Params &p)
     // Determine N_cells
     p.N_cells = temp_W.size() / p.N_vars;
     p.dx = p.L / p.N_cells;
-    c.resize((p.N_cells + 2) * p.N_vars);
+    c.resize(p.N_cells + 2);
 
     // Resize vectors
     for (int i = 0; i <= p.N_cells + 1; i++)
     {
-        c[i].W.resize(p.N_vars);
-        c[i].U.resize(p.N_vars);
-        c[i].F.resize(p.N_vars);
-        c[i].FL.resize(p.N_vars);
-        c[i].FR.resize(p.N_vars);
         c[i].GAMMA = p.GAMMA;
+        c[i].N_dust = p.N_dust;
+        c[i].initialize();
     }
 
     for (int i = 0; i < p.N_cells; i++)
     {
-        for (int j = 0; j < p.N_vars; j++)
-        {
-            c[i + 1].W[j] = temp_W[i * p.N_vars + j];
+        c[i+1].W[0][0] = temp_W[i * p.N_vars + 0];
+        c[i+1].W[0][1] = temp_W[i * p.N_vars + 1];
+        c[i+1].W[0][2] = temp_W[i * p.N_vars + 2];
+        
+        for(int j=1; j<=p.N_dust; j++){
+            c[i+1].W[j][0] = temp_W[i * p.N_vars + 3 + 2*(j-1)];
+            c[i+1].W[j][1] = temp_W[i * p.N_vars + 4 + 2*(j-1)];
         }
+        
         c[i + 1].get_U_from_W();
     }
 
@@ -120,10 +127,13 @@ void write_output(std::vector<Cell> c, Params p, Vars &v)
         fp << std::scientific << std::setprecision(10); // 5 significant digits
         for (int i = 1; i <= p.N_cells; i++)
         {
-            for (int j = 0; j < p.N_vars; j++)
-            {
-                fp << c[i].W[j] << " ";
+            fp << c[i].W[0][0] << " " << c[i].W[0][1] << " " << c[i].W[0][2] << " ";
+
+            for(int j = 1; j <= p.N_dust; j++){
+                fp << c[i].W[j][0] << " " << c[i].W[j][1] << " ";
             }
+            
+            fp << v.t << " ";
             fp << "\n";
         }
         v.k_snap += 1;

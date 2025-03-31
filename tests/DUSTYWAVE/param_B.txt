@@ -1,0 +1,23 @@
+# Mandatory variables
+t_max:                  2.0                # Maximum time
+dt_snap:                0.1                # Time interval of snapshots
+GAMMA:                  1.00001                # Adiabatic index
+BoundaryCondition:      1                  # Boundary condition: 0 -> Transmissive | 1 -> Periodic
+input_file:             wave_B.inp            # Name of the initial condition file 
+output_dir:             output_B/DHD/            # Output directory
+DustSpecies:            4                  # Number of dust species (for now only 0 or 1)
+K_1:                    1.0                  # Drag Coefficient
+K_2:                    1.083038                  # Drag Coefficient
+K_3:                    0.789959                  # Drag Coefficient
+K_4:                    0.5                  # Drag Coefficient
+DragIntegrator:         1                   # Drag integrator: 1 -> DHDHD; 2 -> DHD; 3 -> MDIRK
+
+
+# Optional variables
+#N_dims:                 1                  # Number of dimensions (for radially symmetric shocks)
+#L:                      1                  # Lenght of the domain (defaul: 1)
+#RiemannSolver:          0                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
+#CFL:                    0.1                # Courant number (default 0.1)
+#dt:                      1e-5               # Constant timestep. If not defined, a Courant timestep is used
+
+

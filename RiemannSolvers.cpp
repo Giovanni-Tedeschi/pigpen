@@ -1,149 +1,174 @@
 #include "RiemannSolvers.h"
+#include "BoundaryConditions.h"
 #include <algorithm>
 #include <cmath>
 
-void get_dust_flux(Cell &Left, Cell &Right)
+void compute_fluxes(std::vector<Cell> &c, Params p)
 {
-    double rho_dL = Left.W[3];
-    double vel_dL = Left.W[4];
-    double rho_dR = Right.W[3];
-    double vel_dR = Right.W[4];
-    if ((vel_dL >= 0.) && (vel_dR >= 0.))
+    for (int i = 1; i <= p.N_cells; i++)
     {
-        Left.FR[2] += 0.5 * rho_dL * pow(vel_dL,3);
-        Left.FR[3] = rho_dL * vel_dL;
-        Left.FR[4] = rho_dL * pow(vel_dL, 2);
+        c[i].get_F();
     }
-    else if ((vel_dL <= 0.) && (vel_dR <= 0.))
+
+    apply_boundary_conditions(c, p);
+
+    for (int i = 0; i <= p.N_cells; i++)
     {
-        Left.FR[2] += 0.5 * rho_dR * pow(vel_dR,3);
-        Left.FR[3] = rho_dR * vel_dR;
-        Left.FR[4] = rho_dR * pow(vel_dR, 2);
+        if(p.RiemannSolver == 0){
+            get_exact_flux(c[i], c[i + 1], p.GAMMA);
+        }else{
+            get_hll_flux(c[i], c[i + 1]);
+        }
+        get_dust_flux(c[i], c[i + 1], p.N_dust);
     }
-    else if ((vel_dL <= 0.) && (vel_dR >= 0.))
-    {
-        Left.FR[3] = 0.;
-        Left.FR[4] = 0.;
+}
+
+void get_dust_flux(Cell &Left, Cell &Right, int N_dust)
+{
+    for(int j=1; j<=N_dust; j++){
+        double rho_dL = Left.W[j][0];
+        double vel_dL = Left.W[j][1];
+        double rho_dR = Right.W[j][0];
+        double vel_dR = Right.W[j][1];
+        if ((vel_dL > 0.) && (vel_dR > 0.))
+        {
+            Left.FR[0][2] += 0.5 * rho_dL * pow(vel_dL,3);
+            Left.FR[j][0] = rho_dL * vel_dL;
+            Left.FR[j][1] = rho_dL * pow(vel_dL, 2);
+        }
+        else if ((vel_dL < 0.) && (vel_dR < 0.))
+        {
+            Left.FR[0][2] += 0.5 * rho_dR * pow(vel_dR,3);
+            Left.FR[j][0] = rho_dR * vel_dR;
+            Left.FR[j][1] = rho_dR * pow(vel_dR, 2);
+        }
+        else if ((vel_dL <= 0.) && (vel_dR >= 0.))
+        {
+            Left.FR[j][0] = 0.;
+            Left.FR[j][1] = 0.;
+        }
+        else if ((vel_dL > 0.) && (vel_dR < 0.))
+        {
+            Left.FR[0][2] += 0.5 * rho_dL * pow(vel_dL,3) +  0.5 * rho_dR * pow(vel_dR,3);
+            Left.FR[j][0] = rho_dL * vel_dL + rho_dR * vel_dR;
+            Left.FR[j][1] = rho_dL * pow(vel_dL, 2) + rho_dR * pow(vel_dR, 2);
+        }
+
+        Right.FL[0][2] = Left.FR[0][2];
+        for (int l = 0; l < 2; l++)
+            Right.FL[j][l] = Left.FR[j][l];
     }
-    else if ((vel_dL >= 0.) && (vel_dR <= 0.))
-    {
-        Left.FR[2] += 0.5 * rho_dL * pow(vel_dL,3) +  0.5 * rho_dR * pow(vel_dR,3);
-        Left.FR[3] = rho_dL * vel_dL + rho_dR * vel_dR;
-        Left.FR[4] = rho_dL * pow(vel_dL, 2) + rho_dR * pow(vel_dR, 2);
-    }
-    for (int j = 2; j < 5; j++)
-        Right.FL[j] = Left.FR[j];
 }
 
 
 void get_hll_flux(Cell &Left, Cell &Right)
 {
     double sPlus, sL, sR;
-    sPlus = std::max(fabs(Left.W[1]) + sqrt(Left.get_SoundSpeed2()), fabs(Right.W[1]) + sqrt(Right.get_SoundSpeed2()));
+    sPlus = std::max(fabs(Left.W[0][1]) + sqrt(Left.get_SoundSpeed2()), fabs(Right.W[0][1]) + sqrt(Right.get_SoundSpeed2()));
     sL = -sPlus;
     sR = sPlus;
 
     if (sL >= 0)
     {
         for (int j = 0; j < 3; j++)
-            Left.FR[j] = Left.F[j];
+            Left.FR[0][j] = Left.F[0][j];
     }
     else if (sR <= 0)
     {
         for (int j = 0; j < 3; j++)
-            Left.FR[j] = Right.F[j];
+            Left.FR[0][j] = Right.F[0][j];
     }
     else
     {
         for (int j = 0; j < 3; j++)
-            Left.FR[j] = (sR * Left.F[j] - sL * Right.F[j] + sL * sR * (Right.U[j] - Left.U[j])) / (sR - sL);
+            Left.FR[0][j] = (sR * Left.F[0][j] - sL * Right.F[0][j] + sL * sR * (Right.U[0][j] - Left.U[0][j])) / (sR - sL);
     }
 
     for (int j = 0; j < 3; j++)
-        Right.FL[j] = Left.FR[j];
+        Right.FL[0][j] = Left.FR[0][j];
 }
 
 
 void get_exact_flux(Cell &Left, Cell &Right, double GAMMA){
     // CALCULATE THE GAS-PART OF THE WAVE DIAGRAM
     double Wstar[3];
-    double pStar = get_pstar(Left.W, Right.W, GAMMA);
-    double uStar = 0.5*(Left.W[1] + Right.W[1]) + 0.5*(fK(pStar, Left.W, Right.W, 1, GAMMA) - fK(pStar, Left.W, Right.W, -1, GAMMA));
+    double pStar = get_pstar(Left.W[0], Right.W[0], GAMMA);
+    double uStar = 0.5*(Left.W[0][1] + Right.W[0][1]) + 0.5*(fK(pStar, Left.W[0], Right.W[0], 1, GAMMA) - fK(pStar, Left.W[0], Right.W[0], -1, GAMMA));
     
     if(uStar > 0.){
         double aL = sqrt(Left.get_SoundSpeed2());
-        if(pStar > Left.W[2]){
+        if(pStar > Left.W[0][2]){
             // LEFT SHOCK WAVE
-            double sL = Left.W[1] - aL*sqrt((GAMMA+1.)/2./GAMMA*pStar/Left.W[2] + (GAMMA-1.)/2./GAMMA);
+            double sL = Left.W[0][1] - aL*sqrt((GAMMA+1.)/2./GAMMA*pStar/Left.W[0][2] + (GAMMA-1.)/2./GAMMA);
             if(sL > 0.){
-                Wstar[0] = Left.W[0];
-                Wstar[1] = Left.W[1];
-                Wstar[2] = Left.W[2];
+                Wstar[0] = Left.W[0][0];
+                Wstar[1] = Left.W[0][1];
+                Wstar[2] = Left.W[0][2];
             }else{
-                Wstar[0] = Left.W[0]* ((pStar / Left.W[2] + (GAMMA-1.)/(GAMMA+1.)) / (1. + ((GAMMA-1.)/(GAMMA+1.))*pStar/Left.W[2]));
+                Wstar[0] = Left.W[0][0]* ((pStar / Left.W[0][2] + (GAMMA-1.)/(GAMMA+1.)) / (1. + ((GAMMA-1.)/(GAMMA+1.))*pStar/Left.W[0][2]));
                 Wstar[1] = uStar;
                 Wstar[2] = pStar;
             }
         }else{
             // LEFT RAREFACTION WAVE
-            double aStarL = aL * pow(pStar/Left.W[2],(GAMMA-1.)/2./GAMMA);
-            double sHL = Left.W[1] - aL;
+            double aStarL = aL * pow(pStar/Left.W[0][2],(GAMMA-1.)/2./GAMMA);
+            double sHL = Left.W[0][1] - aL;
             double sTL = uStar - aStarL;
             if(sTL < 0.){
-                Wstar[0] = Left.W[0] * pow(pStar/Left.W[2],1./GAMMA);
+                Wstar[0] = Left.W[0][0] * pow(pStar/Left.W[0][2],1./GAMMA);
                 Wstar[1] = uStar;
                 Wstar[2] = pStar;
             }else if(sHL > 0.){
-                Wstar[0] = Left.W[0];
-                Wstar[1] = Left.W[1];
-                Wstar[2] = Left.W[2];
+                Wstar[0] = Left.W[0][0];
+                Wstar[1] = Left.W[0][1];
+                Wstar[2] = Left.W[0][2];
             }else{
-                Wstar[0] = Left.W[0] * pow(2./(GAMMA+1.) + (GAMMA-1.)/(GAMMA+1.)/aL * Left.W[1], 2./(GAMMA-1.));
-                Wstar[1] = 2./(GAMMA+1.)* (aL + (GAMMA-1.)/2. *Left.W[1]);
-                Wstar[2] = Left.W[2] * pow(2./(GAMMA+1.) + (GAMMA-1.)/(GAMMA+1.)/aL * Left.W[1], 2.*GAMMA/(GAMMA-1.));
+                Wstar[0] = Left.W[0][0] * pow(2./(GAMMA+1.) + (GAMMA-1.)/(GAMMA+1.)/aL * Left.W[0][1], 2./(GAMMA-1.));
+                Wstar[1] = 2./(GAMMA+1.)* (aL + (GAMMA-1.)/2. *Left.W[0][1]);
+                Wstar[2] = Left.W[0][2] * pow(2./(GAMMA+1.) + (GAMMA-1.)/(GAMMA+1.)/aL * Left.W[0][1], 2.*GAMMA/(GAMMA-1.));
             }
         }
     }else{
         double aR = sqrt(Right.get_SoundSpeed2());
-        if(pStar > Right.W[2]){
+        if(pStar > Right.W[0][2]){
             // RIGHT SHOCK WAVE
-            double sR = Right.W[1] + aR*sqrt((GAMMA+1.)/2./GAMMA * pStar/Right.W[2] + (GAMMA-1.)/2./GAMMA);
+            double sR = Right.W[0][1] + aR*sqrt((GAMMA+1.)/2./GAMMA * pStar/Right.W[0][2] + (GAMMA-1.)/2./GAMMA);
             if(sR < 0.){
-                Wstar[0] = Right.W[0];
-                Wstar[1] = Right.W[1];
-                Wstar[2] = Right.W[2];
+                Wstar[0] = Right.W[0][0];
+                Wstar[1] = Right.W[0][1];
+                Wstar[2] = Right.W[0][2];
             }else{
-                Wstar[0] = Right.W[0] * ((pStar / Right.W[2] + (GAMMA-1.)/(GAMMA+1.)) / (1. + ((GAMMA-1.)/(GAMMA+1.))*pStar/Right.W[2]));
+                Wstar[0] = Right.W[0][0] * ((pStar / Right.W[0][2] + (GAMMA-1.)/(GAMMA+1.)) / (1. + ((GAMMA-1.)/(GAMMA+1.))*pStar/Right.W[0][2]));
                 Wstar[1] = uStar;
                 Wstar[2] = pStar;
             }
         }else{
             // RIGHT RAREFACTION WAVE
-            double aStarR = aR * pow(pStar/Right.W[2],(GAMMA-1.)/2./GAMMA);
-            double sHR = Right.W[1] + aR;
+            double aStarR = aR * pow(pStar/Right.W[0][2],(GAMMA-1.)/2./GAMMA);
+            double sHR = Right.W[0][1] + aR;
             double sTR = uStar + aStarR;
             if(sHR < 0.){
-                Wstar[0] = Right.W[0];
-                Wstar[1] = Right.W[1];
-                Wstar[2] = Right.W[2];
+                Wstar[0] = Right.W[0][0];
+                Wstar[1] = Right.W[0][1];
+                Wstar[2] = Right.W[0][2];
             }else if(sTR > 0.){
-                Wstar[0] = Right.W[0] * pow(pStar/Right.W[2],1./GAMMA);
+                Wstar[0] = Right.W[0][0] * pow(pStar/Right.W[0][2],1./GAMMA);
                 Wstar[1] = uStar;
                 Wstar[2] = pStar;
             }else{
-                Wstar[0] = Right.W[0] * pow(2./(GAMMA+1.) - (GAMMA-1.)/(GAMMA+1.)/aR * Right.W[1], 2./(GAMMA-1.));
-                Wstar[1] = 2./(GAMMA+1.)* (-aR + (GAMMA-1.)/2. * Right.W[1]);
-                Wstar[2] = Right.W[2] * pow(2./(GAMMA+1.) - (GAMMA-1.)/(GAMMA+1.)/aR * Right.W[1], 2.*GAMMA/(GAMMA-1.));
+                Wstar[0] = Right.W[0][0] * pow(2./(GAMMA+1.) - (GAMMA-1.)/(GAMMA+1.)/aR * Right.W[0][1], 2./(GAMMA-1.));
+                Wstar[1] = 2./(GAMMA+1.)* (-aR + (GAMMA-1.)/2. * Right.W[0][1]);
+                Wstar[2] = Right.W[0][2] * pow(2./(GAMMA+1.) - (GAMMA-1.)/(GAMMA+1.)/aR * Right.W[0][1], 2.*GAMMA/(GAMMA-1.));
             }
         }
     }
 
     // COMPUTE THE INTERMEDIATE INTERCELL FLUX FOR THE GAS PART
-    Left.FR[0] = Wstar[0] * Wstar[1];
-    Left.FR[1] = Wstar[0] * pow(Wstar[1],2) + Wstar[2];
-    Left.FR[2] = 0.5 * Wstar[0] * pow(Wstar[1],3) + Wstar[1]*Wstar[2] + Wstar[1]*Wstar[2]/(GAMMA-1.);
+    Left.FR[0][0] = Wstar[0] * Wstar[1];
+    Left.FR[0][1] = Wstar[0] * pow(Wstar[1],2) + Wstar[2];
+    Left.FR[0][2] = 0.5 * Wstar[0] * pow(Wstar[1],3) + Wstar[1]*Wstar[2] + Wstar[1]*Wstar[2]/(GAMMA-1.);
     for (int j = 0; j < 3; j++)
-        Right.FL[j] = Left.FR[j];
+        Right.FL[0][j] = Left.FR[0][j];
 }
 
 
