@@ -19,10 +19,9 @@
 
 
 void integrate_external_force(std::vector<Cell> &c, Params p, double dt){
-    double g0 = 0.0;
     for (int i = 1; i <= p.N_cells; i++)
     {
-        c[i].W[0][1] += g0 * dt;
+        c[i].W[0][1] += p.g0 * dt;
         c[i].get_U_from_W();
     }
 }

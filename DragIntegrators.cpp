@@ -160,7 +160,6 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
 
     void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, double dt)
     {
-        double g0 = 0.;
         for(int i = 1; i <= p.N_cells; i++){      
             for(int l=0; l<3; l++){
                 c[i].Un[0][l] = c[i].U[0][l];    
@@ -203,7 +202,7 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
                 }
             }
             
-            c[i].U[0][1] += gamma * dt * g0;
+            c[i].U[0][1] += gamma * dt * p.g0;
     
             MDIRK_K(c[i], p, dt, gamma);
     
@@ -232,7 +231,7 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
                 }
             }
     
-            c[i].U[0][1] += dt * g0;
+            c[i].U[0][1] += dt * p.g0;
     
             MDIRK_K(c[i], p, dt, gamma);
     

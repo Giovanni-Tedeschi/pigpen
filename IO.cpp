@@ -62,7 +62,8 @@ Params read_param(std::string fname)
     p.RiemannSolver = configData.count("RiemannSolver") ? stoi(configData["RiemannSolver"]) : 1;
     p.CFL = configData.count("CFL") ? stof(configData["CFL"]) : 0.1;
     p.const_dt = configData.count("dt") ? stof(configData["dt"]) : -1;
-    p.g0 = configData.count("g0") ? stof(configData["dt"]) : 0.0;
+    p.g0 = configData.count("g0") ? stof(configData["g0"]) : 0.0;
+
     return p;
 }
 
