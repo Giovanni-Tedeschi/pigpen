@@ -77,7 +77,7 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
     for (int i = 1; i <= p.N_cells; i++)
     {
         for(int j = 1; j <= p.N_dust; j++){
-            ts_i = (c[i].U[0][0] * c[i].U[j][0]) / (p.K[j] * (c[i].U[0][0] + c[i].U[j][0]));
+            ts_i = (c[i].U[0][0] * c[i].U[j][0]) / (p.K[j-1] * (c[i].U[0][0] + c[i].U[j][0]));
             ts_max = std::max(ts_max, ts_i);
         }
     }

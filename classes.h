@@ -130,6 +130,7 @@ class Params{
         double dt_snap;
         double L;
         double dx;
+        double const_dt;
         double BC;
         int RiemannSolver;
         int N_cells;
@@ -137,6 +138,7 @@ class Params{
         int N_dust;
         int N_vars;
         int DragIntegrator;
+        double g0;
         std::vector<double> K;
         std::string input_file;
         std::string output_dir;

@@ -18,6 +18,14 @@
 #include "IO.h"
 
 
+void integrate_external_force(std::vector<Cell> &c, Params p, double dt){
+    double g0 = 0.0;
+    for (int i = 1; i <= p.N_cells; i++)
+    {
+        c[i].W[0][1] += g0 * dt;
+        c[i].get_U_from_W();
+    }
+}
 
 void update_variables(std::vector<Cell> &c, Params p, double dt)
 {
@@ -37,14 +45,17 @@ void update_variables(std::vector<Cell> &c, Params p, double dt)
 
 void find_dt(std::vector<Cell> c, Params p, Vars &v)
 {
-    double max_sig_vel = 1e-40;
-    for (int i = 1; i <= p.N_cells; i++)
-    {
-        max_sig_vel = std::max(max_sig_vel, c[i].get_vsig());
-    }
+    if(p.const_dt < 0.){
+        double max_sig_vel = 1e-40;
+        for (int i = 1; i <= p.N_cells; i++)
+        {
+            max_sig_vel = std::max(max_sig_vel, c[i].get_vsig());
+        }
 
-    v.dt = p.CFL * p.dx / max_sig_vel;
-    //v.dt = 1e-5;
+        v.dt = p.CFL * p.dx / max_sig_vel;
+    }else{
+        v.dt = p.const_dt;
+    }
 }
 
 void do_integration_step(std::vector<Cell> &c, Params p, Vars v){
@@ -55,6 +66,7 @@ void do_integration_step(std::vector<Cell> &c, Params p, Vars v){
 
         compute_fluxes(c, p);
         update_variables(c, p, v.dt);
+        integrate_external_force(c, p, v.dt);
     
         integrate_drag_RK(c, p, v.dt/2);
 
@@ -64,11 +76,13 @@ void do_integration_step(std::vector<Cell> &c, Params p, Vars v){
 
         compute_fluxes(c, p);
         update_variables(c, p, v.dt/2);
+        integrate_external_force(c, p, v.dt/2);
     
         integrate_drag_RK(c, p, v.dt/2);
 
         compute_fluxes(c, p);
         update_variables(c, p, v.dt/2);
+        integrate_external_force(c, p, v.dt/2);
     
         integrate_drag_RK(c, p, v.dt/4);
     }else{
