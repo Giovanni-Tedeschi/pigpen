@@ -1,6 +1,6 @@
 import numpy as np
 
-N = 516
+N = 512
 
 # BOX_multi_A
 gasrho = np.ones((N)) * (1)

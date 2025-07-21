@@ -21,8 +21,8 @@
 void integrate_external_force(std::vector<Cell> &c, Params p, double dt){
     for (int i = 1; i <= p.N_cells; i++)
     {
-        c[i].W[0][1] += p.g0 * dt;
-        c[i].get_U_from_W();
+        c[i].U[0][1] += p.g0 * dt;
+        c[i].get_W_from_U();
     }
 }
 
@@ -66,7 +66,7 @@ void do_integration_step(std::vector<Cell> &c, Params p, Vars v){
         compute_fluxes(c, p);
         update_variables(c, p, v.dt);
         integrate_external_force(c, p, v.dt);
-    
+
         integrate_drag_RK(c, p, v.dt/2);
 
     }else if(p.DragIntegrator == 2){
@@ -76,19 +76,20 @@ void do_integration_step(std::vector<Cell> &c, Params p, Vars v){
         compute_fluxes(c, p);
         update_variables(c, p, v.dt/2);
         integrate_external_force(c, p, v.dt/2);
-    
+
         integrate_drag_RK(c, p, v.dt/2);
 
         compute_fluxes(c, p);
         update_variables(c, p, v.dt/2);
         integrate_external_force(c, p, v.dt/2);
-    
+
         integrate_drag_RK(c, p, v.dt/4);
     }else{
         // MDIRK
         integrate_drag_MDIRK(c, p, v.dt);
     }
 }
+
 
 
 int main(int argc, char *argv[])
@@ -105,11 +106,12 @@ int main(int argc, char *argv[])
     while (v.t < p.t_max)
     {
         find_dt(c, p, v);
-        
+
         do_integration_step(c, p, v);
-        
+
         v.t += v.dt;
 
         write_output(c, p, v);
     }
+
 }

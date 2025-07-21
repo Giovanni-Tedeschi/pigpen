@@ -5,7 +5,7 @@ GAMMA:                  1.0001               # Adiabatic index
 BoundaryCondition:      0                 # Boundary condition: 0 -> Transmissive | 1 -> Periodic
 input_file:             shock_B.inp            # Name of the initial condition file 
 output_dir:             output_B/DHDHD/            # Output directory
-DustSpecies:            3                  # Number of dust species (for now only 0 or 1)
+DustSpecies:            3                  # Number of dust species
 K_1:                    1.0                  # Drag Coefficient
 K_2:                    3.0                  # Drag Coefficient
 K_3:                    5.0                  # Drag Coefficient

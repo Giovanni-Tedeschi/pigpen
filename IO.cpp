@@ -126,7 +126,7 @@ void write_output(std::vector<Cell> c, Params p, Vars &v)
         printf("%lf %d\n", v.t, v.k_snap);
         std::string output_file = p.output_dir + std::to_string(v.k_snap) + ".txt";
         std::ofstream fp(output_file, std::ios::out);
-        fp << std::scientific << std::setprecision(10); // 5 significant digits
+        fp << std::scientific << std::setprecision(20); // 20 significant digits
         for (int i = 1; i <= p.N_cells; i++)
         {
             fp << c[i].W[0][0] << " " << c[i].W[0][1] << " " << c[i].W[0][2] << " ";

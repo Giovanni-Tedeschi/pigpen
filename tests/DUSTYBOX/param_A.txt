@@ -14,8 +14,8 @@ DragIntegrator:         1                  # Drag integrator: 1 -> DHD; 2 -> DHD
 # Optional variables
 #N_dims:                 1                  # Number of dimensions (for radially symmetric shocks)
 #L:                      1                  # Lenght of the domain (defaul: 1)
-#RiemannSolver:          1                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
+RiemannSolver:          0                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
 #CFL:                    0.1                # Courant number (default 0.1)
-#dt:                      1e-4        # Constant timestep. If not defined, a Courant timestep is used
+#dt:                      1e2        # Constant timestep. If not defined, a Courant timestep is used
 
 
