@@ -121,7 +121,7 @@ std::vector<Cell> read_ic(Params &p)
 
 void write_output(std::vector<Cell> c, Params p, Vars &v)
 {
-    if (v.t - v.k_snap * p.dt_snap > 0)
+    if (v.t - v.k_snap * p.dt_snap >= 0)
     {
         printf("%lf %d\n", v.t, v.k_snap);
         std::string output_file = p.output_dir + std::to_string(v.k_snap) + ".txt";

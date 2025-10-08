@@ -3,8 +3,8 @@ t_max:                  2.0                # Maximum time
 dt_snap:                0.1                # Time interval of snapshots
 GAMMA:                  1.00001                # Adiabatic index
 BoundaryCondition:      1                  # Boundary condition: 0 -> Transmissive | 1 -> Periodic
-input_file:             wave_B.inp            # Name of the initial condition file 
-output_dir:             output_B/DHDHD/            # Output directory
+input_file:             wave_B_32.inp            # Name of the initial condition file 
+output_dir:             output_B/DHDHD_32/            # Output directory
 DustSpecies:            4                  # Number of dust species (for now only 0 or 1)
 K_1:                    1.0                  # Drag Coefficient
 K_2:                    1.083038                  # Drag Coefficient
@@ -18,6 +18,6 @@ DragIntegrator:         2                   # Drag integrator: 1 -> DHDHD; 2 -> 
 #L:                      1                  # Lenght of the domain (defaul: 1)
 #RiemannSolver:          0                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
 #CFL:                    0.1                # Courant number (default 0.1)
-#dt:                      1e-5               # Constant timestep. If not defined, a Courant timestep is used
+#dt:                      0.1               # Constant timestep. If not defined, a Courant timestep is used
 
 

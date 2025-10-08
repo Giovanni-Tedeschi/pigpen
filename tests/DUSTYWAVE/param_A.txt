@@ -15,6 +15,6 @@ DragIntegrator:         2                   # Drag integrator: 1 -> DHDHD; 2 -> 
 #L:                      1                  # Lenght of the domain (defaul: 1)
 #RiemannSolver:          0                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
 #CFL:                    0.1                # Courant number (default 0.1)
-#dt:                      1e-5               # Constant timestep. If not defined, a Courant timestep is used
+#dt:                      1e-3               # Constant timestep. If not defined, a Courant timestep is used
 
 

@@ -9,6 +9,8 @@ class Cell{
     public:
         std::vector<std::vector<double>> W;
         std::vector<std::vector<double>> U;
+        std::vector<std::vector<double>> dU;
+        std::vector<std::vector<double>> dW;
         std::vector<std::vector<double>> F;
         std::vector<std::vector<double>> FL;
         std::vector<std::vector<double>> FR;
@@ -36,6 +38,8 @@ class Cell{
 
             W.resize(N_dust+1);
             U.resize(N_dust+1);
+            dW.resize(N_dust+1);
+            dU.resize(N_dust+1);
             F.resize(N_dust+1);
             FL.resize(N_dust+1);
             FR.resize(N_dust+1);
@@ -47,6 +51,8 @@ class Cell{
 
             W[0].resize(3);
             U[0].resize(3);
+            dW[0].resize(3);
+            dU[0].resize(3);
             F[0].resize(3);
             FL[0].resize(3);
             FR[0].resize(3);
@@ -58,7 +64,9 @@ class Cell{
 
             for(int j=1; j<=N_dust; j++){
                 W[j].resize(2);
-                U[j].resize(2);   
+                U[j].resize(2);  
+                dW[j].resize(2);
+                dU[j].resize(2);   
                 F[j].resize(2);
                 FL[j].resize(2);
                 FR[j].resize(2);

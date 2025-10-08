@@ -103,6 +103,8 @@ int main(int argc, char *argv[])
 
     std::vector<Cell> c = read_ic(p);
 
+    write_output(c, p, v);
+
     while (v.t < p.t_max)
     {
         find_dt(c, p, v);

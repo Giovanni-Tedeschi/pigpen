@@ -1,5 +1,6 @@
 #include "RiemannSolvers.h"
 #include "BoundaryConditions.h"
+#include "Reconstruction.h"
 #include <algorithm>
 #include <cmath>
 
@@ -11,15 +12,18 @@ void compute_fluxes(std::vector<Cell> &c, Params p)
     }
 
     apply_boundary_conditions(c, p);
+    compute_slopes(c,p);
 
     for (int i = 0; i <= p.N_cells; i++)
     {
+        //reconstruct_cell_pair(c[i], c[i+1], p.N_dust, 1);
         if(p.RiemannSolver == 0){
             get_exact_flux(c[i], c[i + 1], p.GAMMA);
         }else{
             get_hll_flux(c[i], c[i + 1]);
         }
         get_dust_flux(c[i], c[i + 1], p.N_dust);
+        //reconstruct_cell_pair(c[i], c[i+1], p.N_dust, -1);
     }
 }
 

@@ -2,9 +2,9 @@
 CXX = g++
 CXXFLAGS = -std=c++17 -O2 
 
-SRCS = run.cpp RiemannSolvers.cpp IO.cpp DragIntegrators.cpp BoundaryConditions.cpp
-OBJS = run.o RiemannSolvers.o IO.o DragIntegrators.o BoundaryConditions.o
-HEADERS = RiemannSolvers.h IO.h classes.h DragIntegrators.h BoundaryConditions.h
+SRCS = run.cpp RiemannSolvers.cpp IO.cpp DragIntegrators.cpp BoundaryConditions.cpp Reconstruction.cpp
+OBJS = run.o RiemannSolvers.o IO.o DragIntegrators.o BoundaryConditions.o Reconstruction.o 
+HEADERS = RiemannSolvers.h IO.h classes.h DragIntegrators.h BoundaryConditions.h Reconstruction.h
 
 TARGET = pigpen.exe
 
