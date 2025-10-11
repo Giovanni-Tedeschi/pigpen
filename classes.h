@@ -4,11 +4,13 @@
 #include <vector>
 #include <cmath>
 #include <sstream>
+#include "indices.h"
 
 class Cell{
     public:
         std::vector<std::vector<double>> W;
         std::vector<std::vector<double>> U;
+        std::vector<std::vector<double>> Uold;
         std::vector<std::vector<double>> dU;
         std::vector<std::vector<double>> dW;
         std::vector<std::vector<double>> F;
@@ -21,7 +23,12 @@ class Cell{
         std::vector<std::vector<double>> Un;
         std::vector<double> alpha;
         double GAMMA;
+        double sound_speed;
         int N_dust;
+        int N_dims;
+        int N_var_gas;
+        int N_var_dust;
+        double x_center;
 
         Cell& operator=(const Cell& other) {
             if (this != &other) {  // Prevent self-assignment
@@ -38,6 +45,7 @@ class Cell{
 
             W.resize(N_dust+1);
             U.resize(N_dust+1);
+            Uold.resize(N_dust+1);
             dW.resize(N_dust+1);
             dU.resize(N_dust+1);
             F.resize(N_dust+1);
@@ -49,82 +57,151 @@ class Cell{
             Un.resize(N_dust+1);
             Ln.resize(N_dust+1);
 
-            W[0].resize(3);
-            U[0].resize(3);
-            dW[0].resize(3);
-            dU[0].resize(3);
-            F[0].resize(3);
-            FL[0].resize(3);
-            FR[0].resize(3);
-            K1[0].resize(3);
-            K2[0].resize(3);
-            K[0].resize(3);
-            Un[0].resize(3);
-            Ln[0].resize(3);
+            W[0].resize(N_var_gas);
+            U[0].resize(N_var_gas);
+            Uold[0].resize(N_var_gas);
+            dW[0].resize(N_var_gas);
+            dU[0].resize(N_var_gas);
+            F[0].resize(N_var_gas);
+            FL[0].resize(N_var_gas);
+            FR[0].resize(N_var_gas);
+            K1[0].resize(N_var_gas);
+            K2[0].resize(N_var_gas);
+            K[0].resize(N_var_gas);
+            Un[0].resize(N_var_gas);
+            Ln[0].resize(N_var_gas);
 
             for(int j=1; j<=N_dust; j++){
-                W[j].resize(2);
-                U[j].resize(2);  
-                dW[j].resize(2);
-                dU[j].resize(2);   
-                F[j].resize(2);
-                FL[j].resize(2);
-                FR[j].resize(2);
-                K1[j].resize(2);
-                K2[j].resize(2);
-                K[j].resize(2);
-                Un[j].resize(2);
-                Ln[j].resize(2);
+                W[j].resize(N_var_dust);
+                U[j].resize(N_var_dust);  
+                Uold[j].resize(N_var_dust);  
+                dW[j].resize(N_var_dust);
+                dU[j].resize(N_var_dust);   
+                F[j].resize(N_var_dust);
+                FL[j].resize(N_var_dust);
+                FR[j].resize(N_var_dust);
+                K1[j].resize(N_var_dust);
+                K2[j].resize(N_var_dust);
+                K[j].resize(N_var_dust);
+                Un[j].resize(N_var_dust);
+                Ln[j].resize(N_var_dust);
             }
         }
 
 
         void get_U_from_W(){
             // GAS
-            U[0][0] = W[0][0];                                               
-            U[0][1] = W[0][0] * W[0][1];        
-            U[0][2] = 0.5 * W[0][0] * W[0][1] * W[0][1] + W[0][2] / (GAMMA-1.);    
+            double v2 = W[0][idx.vx] * W[0][idx.vx];
+            U[0][idx.rho] = W[0][idx.rho];                                               
+            U[0][idx.vx] = W[0][idx.rho] * W[0][idx.vx];  
+
             // DUST
             for(int j=1; j<=N_dust; j++){
-                U[j][0] = W[j][0];
-                U[j][1] = W[j][0] * W[j][1];           
-                U[0][2] += 0.5 * W[j][0] * W[j][1] * W[j][1];      
-            }               
+                U[j][idx.rho] = W[j][idx.rho];
+                U[j][idx.vx] = W[j][idx.rho] * W[j][idx.vx];              
+            }
+
+            if (N_dims >= 2){
+                v2 += W[0][idx.vy] * W[0][idx.vy];
+                U[0][idx.vy] = W[0][idx.rho] * W[0][idx.vy];
+                for(int j=1; j<=N_dust; j++){
+                    U[j][idx.vy] = W[j][idx.rho] * W[j][idx.vy];              
+                }
+            }
+
+            if(N_dims == 3){
+                v2 += W[0][idx.vz] * W[0][idx.vz];
+                U[0][idx.vz] = W[0][idx.rho] * W[0][idx.vz];
+                for(int j=1; j<=N_dust; j++){
+                    U[j][idx.vz] = W[j][idx.rho] * W[j][idx.vz];              
+                }
+            }
+
+            if(sound_speed < 0.){
+                U[0][idx.P] = 0.5 * W[0][idx.rho] * v2 + W[0][idx.P] / (GAMMA-1.);  
+            }else{
+                U[0][idx.P] = 0.5 * W[0][idx.rho] * v2;
+            }
         }
 
         void get_W_from_U(){
             // GAS
-            W[0][0] = U[0][0];                    
-            W[0][1] = U[0][1] / U[0][0];    
-            W[0][2] = (U[0][2] - 0.5 * W[0][0]*W[0][1]*W[0][1]) * (GAMMA-1.);   
+            double v2 = W[0][idx.vx]*W[0][idx.vx];
+            W[0][idx.rho] = U[0][idx.rho];                    
+            W[0][idx.vx] = U[0][idx.vx] / U[0][idx.rho];     
             // DUST
             for(int j=1; j<=N_dust; j++){
-                W[j][0] = U[j][0];
-                W[j][1] = U[j][1] / U[j][0];
-                W[0][2] -= (0.5 * W[j][0] * W[j][1] * W[j][1])* (GAMMA-1.);
+                W[j][idx.rho] = U[j][idx.rho];
+                W[j][idx.vx] = U[j][idx.vx] / U[j][idx.rho];
             }
+
+            if (N_dims >= 2){ 
+                W[0][idx.vy] = U[0][idx.vy] / U[0][idx.rho];     
+                v2 += W[0][idx.vy] * W[0][idx.vy];
+                for(int j=1; j<=N_dust; j++){
+                    W[j][idx.vy] = U[j][idx.vy] / U[j][idx.rho];            
+                }
+            }
+
+            if (N_dims == 3){ 
+                W[0][idx.vz] = U[0][idx.vz] / U[0][idx.rho];     
+                v2 += W[0][idx.vz] * W[0][idx.vz];
+                for(int j=1; j<=N_dust; j++){
+                    W[j][idx.vz] = U[j][idx.vz] / U[j][idx.rho];            
+                }
+            }
+
+            if(sound_speed < 0.){
+                W[0][idx.P] = (U[0][idx.P] - 0.5 * W[0][idx.rho]*v2) * (GAMMA-1.);  
+            }else{
+                W[0][idx.P] = W[0][idx.rho] * pow(sound_speed,2);
+            }
+            
         }
 
         void get_F(){
-            // GAS
-            F[0][0] = W[0][0]*W[0][1];
-            F[0][1] = W[0][0]*W[0][1]*W[0][1] + W[0][2];
-            F[0][2] = W[0][1] * (0.5 * W[0][0] * W[0][1] * W[0][1] + W[0][2] * GAMMA / (GAMMA-1.)); 
-            // DUST
-            for(int j=1; j<=N_dust; j++){
-                F[j][0] = W[j][0]*W[j][1];
-                F[j][1] = W[j][0]*W[j][1]*W[j][1];
+            double v2 = W[0][idx.vx] * W[0][idx.vx];
+            F[0][idx.rho] = W[0][idx.rho]*W[0][idx.vx];
+            F[0][idx.vx] = W[0][idx.rho]*W[0][idx.vx]*W[0][idx.vx] + W[0][idx.P];
+
+            if (N_dims >= 2){
+                v2 += W[0][idx.vy] * W[0][idx.vy];
+                F[0][idx.vy] = W[0][idx.rho]*W[0][idx.vx]*W[0][idx.vy];
             }
+
+            if (N_dims == 3){
+                v2 += W[0][idx.vz] * W[0][idx.vz];
+                F[0][idx.vz] = W[0][idx.rho]*W[0][idx.vx]*W[0][idx.vz];
+            }
+            
+            if(sound_speed < 0.){
+                F[0][idx.P] = W[0][idx.vx] * (0.5 * W[0][idx.rho] * v2 + W[0][idx.P] * GAMMA / (GAMMA-1.)); 
+            }else{
+                F[0][idx.P] = W[0][idx.vx] * W[0][idx.rho] * (0.5 * v2 + pow(sound_speed,2)); 
+            }
+            
         }
 
         double get_SoundSpeed2(){
-            return GAMMA*W[0][2]/W[0][0];
+            if(sound_speed < 0.){
+                return GAMMA*W[0][idx.P]/W[0][idx.rho];
+            }else{
+                return sound_speed*sound_speed;
+            }
         }
 
         double get_vsig(){
-            double vsig = fabs(W[0][1]) + sqrt(get_SoundSpeed2());
+            double v2 = W[0][idx.vx] * W[0][idx.vx];
+            if (N_dims >= 2) v2 += W[0][idx.vy] * W[0][idx.vy];
+            if (N_dims == 3) v2 += W[0][idx.vz] * W[0][idx.vz];
+
+            double vsig = sqrt(v2) + sqrt(get_SoundSpeed2());
+
             for(int j=1; j<=N_dust; j++){
-                vsig += fabs(W[j][1]);
+                v2 = W[j][idx.vx] * W[j][idx.vx];
+                if (N_dims >= 2) v2 += W[j][idx.vy] * W[j][idx.vy];
+                if (N_dims == 3) v2 += W[j][idx.vz] * W[j][idx.vz];
+                vsig += sqrt(v2);
             }
             return vsig;
         }
@@ -134,19 +211,27 @@ class Params{
     public:
         double CFL;
         double GAMMA;
+        double sound_speed;
         double t_max;
         double dt_snap;
         double L;
         double dx;
         double const_dt;
         double BC;
+        int ghost_in_input;
         int RiemannSolver;
         int N_cells;
+        int N_ghost;
         int N_dims;
         int N_dust;
+        int N_var_gas;
+        int N_var_dust;
         int N_vars;
         int DragIntegrator;
+        int apply_reconstruction;
         double g0;
+        double Omega0;
+        double q;
         std::vector<double> K;
         std::string input_file;
         std::string output_dir;

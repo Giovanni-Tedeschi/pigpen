@@ -1,3 +1,4 @@
+#include "indices.h"
 #include "RiemannSolvers.h"
 #include "BoundaryConditions.h"
 #include "Reconstruction.h"
@@ -6,60 +7,57 @@
 
 void compute_fluxes(std::vector<Cell> &c, Params p)
 {
-    for (int i = 1; i <= p.N_cells; i++)
-    {
-        c[i].get_F();
-    }
+    if(p.apply_reconstruction == 1) compute_slopes(c,p);
 
-    apply_boundary_conditions(c, p);
-    compute_slopes(c,p);
-
-    for (int i = 0; i <= p.N_cells; i++)
+    for (int i = p.N_ghost-1; i < p.N_cells + p.N_ghost ; i++)
     {
-        //reconstruct_cell_pair(c[i], c[i+1], p.N_dust, 1);
+        if(p.apply_reconstruction == 1) reconstruct_cell_pair(c[i], c[i+1], 1);
+
         if(p.RiemannSolver == 0){
             get_exact_flux(c[i], c[i + 1], p.GAMMA);
         }else{
             get_hll_flux(c[i], c[i + 1]);
         }
-        get_dust_flux(c[i], c[i + 1], p.N_dust);
-        //reconstruct_cell_pair(c[i], c[i+1], p.N_dust, -1);
+        get_dust_flux(c[i], c[i + 1]);
+
+        if(p.apply_reconstruction == 1) reconstruct_cell_pair(c[i], c[i+1], -1);
     }
 }
 
-void get_dust_flux(Cell &Left, Cell &Right, int N_dust)
+void get_dust_flux(Cell &Left, Cell &Right)
 {
-    for(int j=1; j<=N_dust; j++){
-        double rho_dL = Left.W[j][0];
-        double vel_dL = Left.W[j][1];
-        double rho_dR = Right.W[j][0];
-        double vel_dR = Right.W[j][1];
-        if ((vel_dL > 0.) && (vel_dR > 0.))
+    for(int j=1; j<Left.W.size(); j++){
+
+        if ((Left.W[j][idx.vx] > 0.) && (Right.W[j][idx.vx] > 0.))
         {
-            Left.FR[0][2] += 0.5 * rho_dL * pow(vel_dL,3);
-            Left.FR[j][0] = rho_dL * vel_dL;
-            Left.FR[j][1] = rho_dL * pow(vel_dL, 2);
+            Left.FR[j][idx.rho] = Left.W[j][idx.rho] * Left.W[j][idx.vx];
+            Left.FR[j][idx.vx] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vx];
+            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vy];
+            if (Left.N_dims == 3) Left.FR[j][idx.vz] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vz];
         }
-        else if ((vel_dL < 0.) && (vel_dR < 0.))
+        else if ((Left.W[j][idx.vx] < 0.) && (Right.W[j][idx.vx] < 0.))
         {
-            Left.FR[0][2] += 0.5 * rho_dR * pow(vel_dR,3);
-            Left.FR[j][0] = rho_dR * vel_dR;
-            Left.FR[j][1] = rho_dR * pow(vel_dR, 2);
+            Left.FR[j][idx.rho] = Right.W[j][idx.rho] * Right.W[j][idx.vx];
+            Left.FR[j][idx.vx] = Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vx];
+            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vy];
+            if (Left.N_dims == 3) Left.FR[j][idx.vz] = Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vz];
         }
-        else if ((vel_dL <= 0.) && (vel_dR >= 0.))
+        else if ((Left.W[j][idx.vx] <= 0.) && (Right.W[j][idx.vx] >= 0.))
         {
-            Left.FR[j][0] = 0.;
-            Left.FR[j][1] = 0.;
+            Left.FR[j][idx.rho] = 0.;
+            Left.FR[j][idx.vx] = 0.;
+            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = 0.;
+            if (Left.N_dims == 3) Left.FR[j][idx.vz] = 0.;
         }
-        else if ((vel_dL > 0.) && (vel_dR < 0.))
+        else if ((Left.W[j][idx.vx] > 0.) && (Right.W[j][idx.vx] < 0.))
         {
-            Left.FR[0][2] += 0.5 * rho_dL * pow(vel_dL,3) +  0.5 * rho_dR * pow(vel_dR,3);
-            Left.FR[j][0] = rho_dL * vel_dL + rho_dR * vel_dR;
-            Left.FR[j][1] = rho_dL * pow(vel_dL, 2) + rho_dR * pow(vel_dR, 2);
+            Left.FR[j][idx.rho] = Left.W[j][idx.rho] * Left.W[j][idx.vx] + Right.W[j][idx.rho] * Right.W[j][idx.vx];
+            Left.FR[j][idx.vx] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vx] + Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vx];
+            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vy] + Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vy];
+            if (Left.N_dims == 3) Left.FR[j][idx.vz] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vz] + Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vz];
         }
 
-        Right.FL[0][2] = Left.FR[0][2];
-        for (int l = 0; l < 2; l++)
+        for (int l = 0; l < Left.N_var_dust; l++)
             Right.FL[j][l] = Left.FR[j][l];
     }
 }
@@ -68,27 +66,34 @@ void get_dust_flux(Cell &Left, Cell &Right, int N_dust)
 void get_hll_flux(Cell &Left, Cell &Right)
 {
     double sPlus, sL, sR;
-    sPlus = std::max(fabs(Left.W[0][1]) + sqrt(Left.get_SoundSpeed2()), fabs(Right.W[0][1]) + sqrt(Right.get_SoundSpeed2()));
+    sPlus = std::max(fabs(Left.W[0][idx.vx]) + sqrt(Left.get_SoundSpeed2()), fabs(Right.W[0][idx.vx]) + sqrt(Right.get_SoundSpeed2()));
     sL = -sPlus;
     sR = sPlus;
 
-    if (sL >= 0)
+    Left.get_F();
+    Right.get_F();
+    
+    
+    if (sL > 0)
     {
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < Left.N_var_gas; j++)
             Left.FR[0][j] = Left.F[0][j];
     }
-    else if (sR <= 0)
+    else if (sR < 0)
     {
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < Left.N_var_gas; j++)
             Left.FR[0][j] = Right.F[0][j];
     }
     else
     {
-        for (int j = 0; j < 3; j++)
+        for (int j = 0; j < Left.N_var_gas; j++){
             Left.FR[0][j] = (sR * Left.F[0][j] - sL * Right.F[0][j] + sL * sR * (Right.U[0][j] - Left.U[0][j])) / (sR - sL);
+        }
     }
 
-    for (int j = 0; j < 3; j++)
+    //Left.FR[0][idx.P] = 0.;
+
+    for (int j = 0; j < Left.N_var_gas; j++)
         Right.FL[0][j] = Left.FR[0][j];
 }
 

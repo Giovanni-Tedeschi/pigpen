@@ -1,37 +1,52 @@
 #include "RiemannSolvers.h"
+#include "indices.h"
 
 void RK_K(Cell &c, Params p, double dt, double gamma1, double gamma2, double beta1, double beta2){
-    double A1x=0., A1y=0., B1=0, C1=0, D1x=0, D1y=0, E1=0, F1=0, G1x=0, G1y=0, H1=0, L1=0, N1=0;
-    double A2x=0., A2y=0., B2=0, C2=0, D2x=0, D2y=0, E2=0, F2=0, G2x=0, G2y=0, H2=0, L2=0, N2=0;
+    double A1x=0., A1y=0., A1z=0., B1=0, C1=0, D1x=0, D1y=0, D1z=0, E1=0, F1=0, G1x=0, G1y=0, G1z=0, H1=0, L1=0, N1=0;
+    double A2x=0., A2y=0., A2z=0., B2=0, C2=0, D2x=0, D2y=0, D2z=0, E2=0, F2=0, G2x=0, G2y=0, G2z=0, H2=0, L2=0, N2=0;
     double lambda=0., delta1 = 0., delta2=0.;
     double eps = 0.;
     int idust = 0.;
     for(int j=0; j<p.N_dust;j++){
         idust = j+1;
-        c.alpha[j] = p.K[j] / c.U[idust][0];
-        eps = c.U[idust][0] / c.U[0][0];
+        c.alpha[j] = p.K[j] / c.U[idust][idx.rho];
+        eps = c.U[idust][idx.rho] / c.U[0][idx.rho];
 
         lambda = 1. / (1. + c.alpha[j]*dt*(gamma1 + gamma2 + c.alpha[j]*dt*(gamma1*gamma2 - beta1*beta2)));
         delta1 = 1. / (1. + gamma1 * dt * c.alpha[j]);
         delta2 = 1. / (1. + gamma2 * dt * c.alpha[j]);
 
-        A1x += c.alpha[j] * c.U[idust][1] * delta1;
-        A2x += c.alpha[j] * c.U[idust][1] * delta2;
-
+        A1x += c.alpha[j] * c.U[idust][idx.vx] * delta1;
+        A2x += c.alpha[j] * c.U[idust][idx.vx] * delta2;
+        
         B1 += c.alpha[j] * eps * delta1;
         B2 += c.alpha[j] * eps * delta2;
 
         C1 += pow(c.alpha[j],2)*eps*(1.+c.alpha[j]*dt*(gamma1-beta2))*delta1*lambda;
         C2 += pow(c.alpha[j],2)*eps*(1.+c.alpha[j]*dt*(gamma2-beta1))*delta2*lambda;
 
-        D1x += pow(c.alpha[j],2)*c.U[idust][1]*(1.+c.alpha[j]*dt*(gamma1-beta2))*delta1*lambda;
-        D2x += pow(c.alpha[j],2)*c.U[idust][1]*(1.+c.alpha[j]*dt*(gamma2-beta1))*delta2*lambda;
-
+        D1x += pow(c.alpha[j],2)*c.U[idust][idx.vx]*(1.+c.alpha[j]*dt*(gamma1-beta2))*delta1*lambda;
+        D2x += pow(c.alpha[j],2)*c.U[idust][idx.vx]*(1.+c.alpha[j]*dt*(gamma2-beta1))*delta2*lambda;
+        
         E1 += pow(c.alpha[j],2)*eps*delta1*lambda;
         E2 += pow(c.alpha[j],2)*eps*delta2*lambda;
 
         F1 += pow(c.alpha[j],2)*eps * (gamma2 + c.alpha[j]*dt*(gamma1*gamma2 - beta1*beta2))*delta1*lambda;
         F2 += pow(c.alpha[j],2)*eps * (gamma2 + c.alpha[j]*dt*(gamma1*gamma2 - beta1*beta2))*delta2*lambda;
+
+        if(p.N_dims >= 2){
+            A1y += c.alpha[j] * c.U[idust][idx.vy] * delta1;
+            A2y += c.alpha[j] * c.U[idust][idx.vy] * delta2;
+            D1y += pow(c.alpha[j],2)*c.U[idust][idx.vy]*(1.+c.alpha[j]*dt*(gamma1-beta2))*delta1*lambda;
+            D2y += pow(c.alpha[j],2)*c.U[idust][idx.vy]*(1.+c.alpha[j]*dt*(gamma2-beta1))*delta2*lambda;
+        }
+
+        if(p.N_dims == 3){
+            A1z += c.alpha[j] * c.U[idust][idx.vz] * delta1;
+            A2z += c.alpha[j] * c.U[idust][idx.vz] * delta2;
+            D1z += pow(c.alpha[j],2)*c.U[idust][idx.vz]*(1.+c.alpha[j]*dt*(gamma1-beta2))*delta1*lambda;
+            D2z += pow(c.alpha[j],2)*c.U[idust][idx.vz]*(1.+c.alpha[j]*dt*(gamma2-beta1))*delta2*lambda;
+        }
     }
 
     G1x = A1x - beta1*dt*D1x;
@@ -39,6 +54,9 @@ void RK_K(Cell &c, Params p, double dt, double gamma1, double gamma2, double bet
 
     G1y = A1y - beta1*dt*D1y;
     G2y = A2y - beta2*dt*D2y;
+
+    G1z = A1z - beta1*dt*D1z;
+    G2z = A2z - beta2*dt*D2z;
 
     H1 = B1 - beta1*dt*C1;
     H2 = B2 - beta2*dt*C2;
@@ -49,24 +67,46 @@ void RK_K(Cell &c, Params p, double dt, double gamma1, double gamma2, double bet
     N1 = 1. + gamma1*dt*B1 - beta1*beta2*dt*dt*E1;
     N2 = 1. + gamma2*dt*B2 - beta1*beta2*dt*dt*E2;
 
-    c.K1[0][0] = 0.;
-    c.K1[0][1] = (-G1x*N2 + H1*N2*c.U[0][1] + beta1*dt*L1*(G2x-H2*c.U[0][1])) / (beta1*beta2*dt*dt*L1*L2 - N1*N2);
-    c.K1[0][2] = 0.;
+    c.K1[0][idx.rho] = 0.;
+    c.K1[0][idx.vx] = (-G1x*N2 + H1*N2*c.U[0][idx.vx] + beta1*dt*L1*(G2x-H2*c.U[0][idx.vx])) / (beta1*beta2*dt*dt*L1*L2 - N1*N2);
+    c.K1[0][idx.P] = 0.;
 
-    c.K2[0][0] = 0.;
-    c.K2[0][1] = (G2x - c.U[0][1]*H2 - c.K1[0][1]*beta2*dt*L2)/N2;
-    c.K2[0][2] = 0.;
+    c.K2[0][idx.rho] = 0.;
+    c.K2[0][idx.vx] = (G2x - c.U[0][idx.vx]*H2 - c.K1[0][idx.vx]*beta2*dt*L2)/N2;
+    c.K2[0][idx.P] = 0.;
 
     for(int j=0; j<p.N_dust;j++){
         idust = j+1;
-        eps = c.U[idust][0]/c.U[0][0];
+        eps = c.U[idust][idx.rho]/c.U[0][idx.rho];
         lambda = 1. / (1. + c.alpha[j]*dt*(gamma1 + gamma2 + c.alpha[j]*dt*(gamma1*gamma2 - beta1*beta2)));
 
-        c.K1[idust][0] = 0.;
-        c.K1[idust][1] = c.alpha[j]*lambda*((c.U[0][1]*eps - c.U[idust][1])*(1.+c.alpha[j]*dt*(gamma2-beta1)) + c.K1[0][1]*eps*dt*(gamma1+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K2[0][1]*eps*dt*beta1);
+        c.K1[idust][idx.rho] = 0.;
+        c.K1[idust][idx.vx] = c.alpha[j]*lambda*((c.U[0][idx.vx]*eps - c.U[idust][idx.vx])*(1.+c.alpha[j]*dt*(gamma2-beta1)) + c.K1[0][idx.vx]*eps*dt*(gamma1+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K2[0][idx.vx]*eps*dt*beta1);
         
-        c.K2[idust][0] = 0.;
-        c.K2[idust][1] = c.alpha[j]*lambda*((c.U[0][1]*eps - c.U[idust][1])*(1.+c.alpha[j]*dt*(gamma1-beta2)) + c.K2[0][1]*eps*dt*(gamma2+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K1[0][1]*eps*dt*beta2);
+        c.K2[idust][idx.rho] = 0.;
+        c.K2[idust][idx.vx] = c.alpha[j]*lambda*((c.U[0][idx.vx]*eps - c.U[idust][idx.vx])*(1.+c.alpha[j]*dt*(gamma1-beta2)) + c.K2[0][idx.vx]*eps*dt*(gamma2+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K1[0][idx.vx]*eps*dt*beta2);
+    }
+    
+    if(p.N_dims >= 2){
+        c.K1[0][idx.vy] = (-G1y*N2 + H1*N2*c.U[0][idx.vy] + beta1*dt*L1*(G2y-H2*c.U[0][idx.vy])) / (beta1*beta2*dt*dt*L1*L2 - N1*N2);
+        c.K2[0][idx.vy] = (G2y - c.U[0][idx.vy]*H2 - c.K1[0][idx.vy]*beta2*dt*L2)/N2;
+        idust = 0.;
+        for(int j=0; j<p.N_dust;j++){
+            idust = j+1;
+            c.K1[idust][idx.vy] = c.alpha[j]*lambda*((c.U[0][idx.vy]*eps - c.U[idust][idx.vy])*(1.+c.alpha[j]*dt*(gamma2-beta1)) + c.K1[0][idx.vy]*eps*dt*(gamma1+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K2[0][idx.vy]*eps*dt*beta1);
+            c.K2[idust][idx.vy] = c.alpha[j]*lambda*((c.U[0][idx.vy]*eps - c.U[idust][idx.vy])*(1.+c.alpha[j]*dt*(gamma1-beta2)) + c.K2[0][idx.vy]*eps*dt*(gamma2+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K1[0][idx.vy]*eps*dt*beta2);
+        }
+    }
+
+    if(p.N_dims == 3){
+        c.K1[0][idx.vz] = (-G1z*N2 + H1*N2*c.U[0][idx.vz] + beta1*dt*L1*(G2z-H2*c.U[0][idx.vz])) / (beta1*beta2*dt*dt*L1*L2 - N1*N2);
+        c.K2[0][idx.vz] = (G2z - c.U[0][idx.vz]*H2 - c.K1[0][idx.vz]*beta2*dt*L2)/N2;
+        idust = 0.;
+        for(int j=0; j<p.N_dust;j++){
+            idust = j+1;
+            c.K1[idust][idx.vz] = c.alpha[j]*lambda*((c.U[0][idx.vz]*eps - c.U[idust][idx.vz])*(1.+c.alpha[j]*dt*(gamma2-beta1)) + c.K1[0][idx.vz]*eps*dt*(gamma1+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K2[0][idx.vz]*eps*dt*beta1);
+            c.K2[idust][idx.vz] = c.alpha[j]*lambda*((c.U[0][idx.vz]*eps - c.U[idust][idx.vz])*(1.+c.alpha[j]*dt*(gamma1-beta2)) + c.K2[0][idx.vz]*eps*dt*(gamma2+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K1[0][idx.vz]*eps*dt*beta2);
+        }
     }
 }
 
@@ -74,10 +114,10 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
 {
     double ts_i;
     double ts_max = 0.;
-    for (int i = 1; i <= p.N_cells; i++)
+    for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++)
     {
         for(int j = 1; j <= p.N_dust; j++){
-            ts_i = c[i].U[j][0] / p.K[j-1];
+            ts_i = c[i].U[j][idx.rho] / p.K[j-1];
             ts_max = std::max(ts_max, ts_i);
         }
     }
@@ -122,13 +162,27 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
         }
     }
 
-    for(int i = 0; i <= p.N_cells; i++){
+    for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++){
 
         RK_K(c[i], p, dt, gamma1, gamma2, beta1, beta2);
 
-        c[i].U[0][1] += b * dt * c[i].K1[0][1] + (1.-b) * dt * c[i].K2[0][1];
+        c[i].U[0][idx.vx] += b * dt * c[i].K1[0][idx.vx] + (1.-b) * dt * c[i].K2[0][idx.vx];
         for(int j = 1; j <= p.N_dust; j++){
-            c[i].U[j][1] += b * dt * c[i].K1[j][1] + (1.-b) * dt * c[i].K2[j][1];
+            c[i].U[j][idx.vx] += b * dt * c[i].K1[j][idx.vx] + (1.-b) * dt * c[i].K2[j][idx.vx];
+        }
+
+        if(p.N_dims >= 2){
+            c[i].U[0][idx.vy] += b * dt * c[i].K1[0][idx.vy] + (1.-b) * dt * c[i].K2[0][idx.vy];
+            for(int j = 1; j <= p.N_dust; j++){
+                c[i].U[j][idx.vy] += b * dt * c[i].K1[j][idx.vy] + (1.-b) * dt * c[i].K2[j][idx.vy];
+            }
+        }
+
+        if(p.N_dims == 3){
+            c[i].U[0][idx.vz] += b * dt * c[i].K1[0][idx.vz] + (1.-b) * dt * c[i].K2[0][idx.vz];
+            for(int j = 1; j <= p.N_dust; j++){
+                c[i].U[j][idx.vz] += b * dt * c[i].K1[j][idx.vz] + (1.-b) * dt * c[i].K2[j][idx.vz];
+            }
         }
 
         c[i].get_W_from_U();
@@ -162,7 +216,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, double dt)
 {
     compute_fluxes(c, p);
 
-    for(int i = 1; i <= p.N_cells; i++){      
+    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++){      
         for(int l=0; l<3; l++){
             c[i].Un[0][l] = c[i].U[0][l];    
             c[i].Ln[0][l] = (c[i].FL[0][l] - c[i].FR[0][l]) / p.dx;     
@@ -177,7 +231,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, double dt)
     
     double ts_i;
     double ts_max = 0.;
-    for (int i = 1; i <= p.N_cells; i++)
+    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++)
     {
         for(int j = 1; j <= p.N_dust; j++){
             ts_i = (c[i].U[0][0] * c[i].U[j][0]) / (p.K[j-1] * (c[i].U[0][0] + c[i].U[j][0]));
@@ -194,7 +248,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, double dt)
     double b2 = gamma;
     double delta = 1. - 1./(2.*gamma);
     
-    for(int i = 1; i <= p.N_cells; i++){
+    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++){
         for(int l=0; l<3; l++){
             c[i].U[0][l] +=  gamma * dt * (c[i].FL[0][l] - c[i].FR[0][l]) / p.dx;    
         } 
@@ -222,7 +276,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, double dt)
     
     compute_fluxes(c, p);
     
-    for(int i = 1; i <= p.N_cells; i++){
+    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++){
     
         for(int l=0; l<3; l++){
             c[i].U[0][l] = c[i].Un[0][l] + (1-delta)*dt*(c[i].FL[0][l] - c[i].FR[0][l])/p.dx + delta*dt*c[i].Ln[0][l] + beta * dt * c[i].K[0][l];
