@@ -97,7 +97,6 @@ void do_integration_step(std::vector<Cell> &c, Params p, Vars v){
         compute_fluxes(c, p);
         update_variables(c, p, v.dt);
         integrate_external_force(c, p, v.dt);
-        apply_boundary_conditions(c, p);
 
         integrate_drag_RK(c, p, v.dt/2);
 
@@ -148,7 +147,7 @@ int main(int argc, char *argv[])
         do_integration_step(c, p, v);
 
         apply_boundary_conditions(c, p);
-        
+
         v.t += v.dt;
 
         write_output(c, p, v);

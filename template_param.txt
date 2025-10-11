@@ -7,12 +7,20 @@ GAMMA:                  1.66666            # Adiabatic index
 BoundaryCondition:      1                  # Boundary condition: 0 -> Transmissive | 1 -> Periodic
 input_file:             input.inp          # Name of the initial condition file 
 output_dir:             output/            # Output directory
-DustSpecies:            1                  # Number of dust species (for now only 0 or 1)
-K:                      1000               # Drag Coefficient
+DustSpecies:            1                  # Number of dust species
+K_1:                    1000               # Drag Coefficient
 
 
-# Optional variables
-#N_dims:                 1                  # Number of dimensions (for radially symmetric shocks)
-#L:                      1                  # Lenght of the domain (defaul: 1)
-#RiemannSolver:          1                  # Riemann solver: 0 -> Exact | 1 -> HLL (default 1)
-#CFL:                    0.1                # Courant number (default 0.1)
+# Optional variables and their default values
+#CFL:                    0.1                # Courant number
+#L:                      1                  # Lenght of the domain
+#RiemannSolver:          1                  # Riemann solver: 0 -> Exact | 1 -> HLL 
+#N_dims:                 1                  # Number of dimensions 
+#N_ghost:                2                  # Number of ghost cells
+#ghost_in_input:         1                  # The input file contains the value of the ghost cells
+#sound_speed:            -1                 # Constant sound speed. If positive, the simulation will be isothermal
+#apply_reconstruction:   1                  # Apply the linear piecewise reconstruction 
+#dt:                     1e-3               # Constant timestep. If not defined, a Courant timestep is used
+#g0:                     0                  # External forcing term
+#Omega0:                 0                  # Variables for the steady-state gas and dust drift test 
+#q:                      1.5                # By putting Omega0=1 you enable the boundary conditions and external forces for the test 

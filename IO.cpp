@@ -143,6 +143,9 @@ std::vector<Cell> read_ic(Params &p)
             
             c[i + p.N_ghost].get_U_from_W();
         }
+
+        apply_boundary_conditions(c, p);
+        
     }else{
         for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++)
         {
@@ -159,8 +162,6 @@ std::vector<Cell> read_ic(Params &p)
             c[i].get_U_from_W();
         }
     }
-
-    apply_boundary_conditions(c, p);
 
     return c;
 }

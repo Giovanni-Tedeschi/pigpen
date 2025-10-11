@@ -73,7 +73,6 @@ void get_hll_flux(Cell &Left, Cell &Right)
     Left.get_F();
     Right.get_F();
     
-    
     if (sL > 0)
     {
         for (int j = 0; j < Left.N_var_gas; j++)
@@ -90,8 +89,6 @@ void get_hll_flux(Cell &Left, Cell &Right)
             Left.FR[0][j] = (sR * Left.F[0][j] - sL * Right.F[0][j] + sL * sR * (Right.U[0][j] - Left.U[0][j])) / (sR - sL);
         }
     }
-
-    //Left.FR[0][idx.P] = 0.;
 
     for (int j = 0; j < Left.N_var_gas; j++)
         Right.FL[0][j] = Left.FR[0][j];
