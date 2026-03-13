@@ -213,3 +213,52 @@ def write_steady_state_drift(N, folder):
 
     W = np.swapaxes(W, 0, 1)
     np.savetxt(f"{folder}/STEADY_STATE_DRIFT/linA.inp", W) 
+
+
+
+# PTC_SHOCK
+
+def write_ptc_shock(N, folder):
+    N_part = int(N * 0.5)
+
+    gasrhoL = np.ones((N_part))
+    gasvelxL = np.ones((N_part)) * 0.0
+    gasvelyL = np.ones((N_part)) * 0.0
+    PL = gasrhoL
+
+    dustrhoL = np.ones((N_part))
+    dustvelxL = np.ones((N_part)) * 0.0
+    dustvelyL = np.ones((N_part)) * 0.0
+    dusts11L = np.ones((N_part)) * 2.0
+    dusts12L = np.ones((N_part)) * 0.05
+    dusts22L = np.ones((N_part)) * 0.6
+    
+    N_part = int(N * 0.5)
+    gasrhoR = np.ones((N_part))
+    gasvelxR = np.ones((N_part)) * 0.0
+    gasvelyR = np.ones((N_part)) * 0.0
+    PR = gasrhoR
+
+    dustrhoR = np.ones((N_part)) * 0.125
+    dustvelxR = np.ones((N_part)) * 0.0
+    dustvelyR = np.ones((N_part)) * 0.0
+    dusts11R = np.ones((N_part)) * 0.2 / 0.125
+    dusts12R = np.ones((N_part)) * 0.1 / 0.125
+    dusts22R = np.ones((N_part)) * 0.2 / 0.125
+    
+    gasrho = np.concatenate((gasrhoL, gasrhoR))
+    gasvelx = np.concatenate((gasvelxL, gasvelxR))
+    gasvely = np.concatenate((gasvelyL, gasvelyR))
+
+    dustrho = np.concatenate((dustrhoL, dustrhoR))
+    dustvelx = np.concatenate((dustvelxL, dustvelxR))
+    dustvely = np.concatenate((dustvelyL, dustvelyR))
+    dusts11 = np.concatenate((dusts11L, dusts11R))
+    dusts12 = np.concatenate((dusts12L, dusts12R))
+    dusts22 = np.concatenate((dusts22L, dusts22R))
+
+    P = np.concatenate((PL, PR))
+
+    W = np.vstack((gasrho,gasvelx,gasvely,P,dustrho,dustvelx,dustvely,dusts11, dusts12, dusts22))
+    W = np.swapaxes(W, 0, 1)
+    np.savetxt(f"{folder}/PTC_SHOCK/ptc_shock.inp", W)

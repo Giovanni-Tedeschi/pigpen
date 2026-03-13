@@ -7,6 +7,9 @@ struct Indices {
     int vy;
     int vz;
     int P;
+    int s11;
+    int s12;
+    int s22;
     // Add more as needed
 };
 

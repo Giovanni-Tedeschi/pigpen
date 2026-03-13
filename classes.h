@@ -28,6 +28,7 @@ class Cell{
         int N_dims;
         int N_var_gas;
         int N_var_dust;
+        int PTC;
         double x_center;
 
         Cell& operator=(const Cell& other) {
@@ -122,6 +123,16 @@ class Cell{
             }else{
                 U[0][idx.P] = 0.5 * W[0][idx.rho] * v2;
             }
+
+            if(PTC == 1){
+                for(int j=1; j<=N_dust; j++){
+                    U[j][idx.s11] = W[j][idx.rho]*(W[j][idx.vx]*W[j][idx.vx] + W[j][idx.s11]);
+                    if (N_dims >= 2){
+                        U[j][idx.s12] = W[j][idx.rho]*(W[j][idx.vx]*W[j][idx.vy] + W[j][idx.s12]);
+                        U[j][idx.s22] = W[j][idx.rho]*(W[j][idx.vy]*W[j][idx.vy] + W[j][idx.s22]);
+                    }
+                }
+            }
         }
 
         void get_W_from_U(){
@@ -156,7 +167,16 @@ class Cell{
             }else{
                 W[0][idx.P] = W[0][idx.rho] * pow(sound_speed,2);
             }
-            
+
+            if(PTC == 1){
+                for(int j=1; j<=N_dust; j++){
+                    W[j][idx.s11] = U[j][idx.s11]/W[j][idx.rho] - W[j][idx.vx]*W[j][idx.vx];
+                    if (N_dims >= 2){ 
+                        W[j][idx.s12] = U[j][idx.s12]/W[j][idx.rho] - W[j][idx.vx]*W[j][idx.vy];
+                        W[j][idx.s22] = U[j][idx.s22]/W[j][idx.rho] - W[j][idx.vy]*W[j][idx.vy];
+                    }
+                }
+            }
         }
 
         void get_F(){
@@ -179,7 +199,30 @@ class Cell{
             }else{
                 F[0][idx.P] = W[0][idx.vx] * W[0][idx.rho] * (0.5 * v2 + pow(sound_speed,2)); 
             }
+        }
+
+        void get_dust_F(){
+            for(int j=1; j<=N_dust; j++){
+                F[j][idx.rho] = W[j][idx.rho]*W[j][idx.vx];
+                F[j][idx.vx] = W[j][idx.rho]*W[j][idx.vx]*W[j][idx.vx];
+                if(N_dims >= 2){
+                    F[j][idx.vy] = W[j][idx.rho]*W[j][idx.vx]*W[j][idx.vy];
+                }
+                if(N_dims == 3){
+                    F[j][idx.vz] = W[j][idx.rho]*W[j][idx.vx]*W[j][idx.vz];
+                }
             
+
+                if(PTC == 1){
+                    F[j][idx.vx] += W[j][idx.rho]*W[j][idx.s11];
+                    F[j][idx.s11] = W[j][idx.rho]*W[j][idx.vx]*(W[j][idx.vx]*W[j][idx.vx] + 3.*W[j][idx.s11]);
+                    if (N_dims >= 2){
+                        F[j][idx.vy] += W[j][idx.rho]*W[j][idx.s12];
+                        F[j][idx.s12] = W[j][idx.rho]*(W[j][idx.vx]*W[j][idx.vx]*W[j][idx.vy] + 2.*W[j][idx.vx]*W[j][idx.s12] + W[j][idx.vy]*W[j][idx.s11]);
+                        F[j][idx.s22] = W[j][idx.rho]*(W[j][idx.vy]*W[j][idx.vy]*W[j][idx.vy] + 2.*W[j][idx.vy]*W[j][idx.s12] + W[j][idx.vx]*W[j][idx.s22]);
+                    }
+                }
+            }
         }
 
         double get_SoundSpeed2(){
@@ -218,6 +261,7 @@ class Params{
         double dx;
         double const_dt;
         double BC;
+        int PTC;
         int ghost_in_input;
         int RiemannSolver;
         int N_cells;

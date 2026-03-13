@@ -18,8 +18,11 @@ void compute_fluxes(std::vector<Cell> &c, Params p)
         }else{
             get_hll_flux(c[i], c[i + 1]);
         }
-        get_dust_flux(c[i], c[i + 1]);
-
+        if(p.PTC == 0){
+            get_dust_flux(c[i], c[i + 1]);
+        }else{
+            get_dust_flux_PTC(c[i], c[i+1]);
+        }
         if(p.apply_reconstruction == 1) reconstruct_cell_pair(c[i], c[i+1], -1);
     }
 }
@@ -59,6 +62,24 @@ void get_dust_flux(Cell &Left, Cell &Right)
 
         for (int l = 0; l < Left.N_var_dust; l++)
             Right.FL[j][l] = Left.FR[j][l];
+    }
+}
+
+void get_dust_flux_PTC(Cell &Left, Cell &Right)
+{
+    for(int j=1; j<Left.W.size(); j++){
+        Left.get_dust_F();
+        Right.get_dust_F();
+        double lmin_left  = Left.W[j][idx.vx]  - sqrt(3.*Left.W[j][idx.s11]);
+        double lmax_right = Right.W[j][idx.vx] + sqrt(3.*Right.W[j][idx.s11]);
+        double inv_denom = 1./(lmin_left - lmax_right);
+        for(int l=0; l<=Left.N_var_dust; l++){
+            double int_state = (lmin_left * Left.U[j][l] - lmax_right * Right.U[j][l]) * inv_denom;
+            int_state -= (Left.F[j][l] - Right.F[j][l]) * inv_denom;
+        
+            Left.FR[j][l] = 0.5 * (Left.F[j][l] + Right.F[j][l]) - 0.5 * fabs(lmin_left) * (int_state - Left.U[j][l]) - 0.5*fabs(lmax_right) * (Right.U[j][l] - int_state);
+            Right.FL[j][l] = Left.FR[j][l];
+        }
     }
 }
 
