@@ -1,25 +1,95 @@
 #include "classes.h"
 
-void compute_slopes(std::vector<Cell> &c, Params p)
+// Helper lambdas at the top of compute_slopes
+auto minmod = [](double a, double b) {
+    if (a * b <= 0.0) return 0.0;
+    return std::abs(a) < std::abs(b) ? a : b;
+};
+
+// van Leer limiter
+auto van_leer = [](double a, double b) -> double {
+    if (a * b <= 0.0) return 0.0;
+    return 2.0 * a * b / (a + b);
+};
+
+// MC (monotonized central) limiter
+auto MC = [](double a, double b) -> double {
+    if (a * b <= 0.0) return 0.0;
+    double c = 0.5 * (a + b);
+    return std::abs(c) < 2.0*std::abs(a) && std::abs(c) < 2.0*std::abs(b)
+           ? c : (std::abs(a) < std::abs(b) ? 2.0*a : 2.0*b);
+};
+
+void compute_slopes(std::vector<Cell> &c, Params p, const Grid& g)
 {
-    double denom;
-    for (int i = p.N_ghost-1; i < p.N_cells + p.N_ghost+1; i++)
+    // X-slopes (always)
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = p.N_ghost - 1; i < g.Nx + p.N_ghost + 1; i++)
     {
-        for (size_t k = 0; k < c[i].U.size(); ++k) {
-            for (size_t l = 0; l < c[i].U[k].size(); ++l) {
-                c[i].dU[k][l] = std::max((c[i+1].U[k][l] - c[i].U[k][l]) * (c[i].U[k][l] - c[i-1].U[k][l]), 0.0) / (c[i+1].U[k][l] - c[i-1].U[k][l] + 1e-20);
+        int flat  = g.flat_idx(i,     j + p.N_ghost, k + p.N_ghost);
+        int flatL = g.flat_idx(i - 1, j + p.N_ghost, k + p.N_ghost);
+        int flatR = g.flat_idx(i + 1, j + p.N_ghost, k + p.N_ghost);
+
+        for (size_t s = 0; s < c[flat].U.size(); ++s)
+        for (size_t var = 0; var < c[flat].U[s].size(); ++var)
+        {
+            double dR = c[flatR].U[s][var] - c[flat].U[s][var];
+            double dL = c[flat].U[s][var]  - c[flatL].U[s][var];
+            c[flat].dU[s][var] = 0.5 * MC(dL, dR);   // swap to van_leer or minmod as needed
+        }
+    }
+    // Y-slopes (only if N_dims >= 2)
+    if (p.N_dims >= 2)
+    {
+        for (int k = 0; k < g.Nz; k++)
+        for (int j = p.N_ghost - 1; j < g.Ny + p.N_ghost + 1; j++)
+        for (int i = 0; i < g.Nx; i++)
+        {
+            int flat  = g.flat_idx(i + p.N_ghost, j,     k + p.N_ghost);
+            int flatL = g.flat_idx(i + p.N_ghost, j - 1, k + p.N_ghost);
+            int flatR = g.flat_idx(i + p.N_ghost, j + 1, k + p.N_ghost);
+
+            for (size_t s = 0; s < c[flat].U.size(); ++s)
+            for (size_t var = 0; var < c[flat].U[s].size(); ++var)
+            {
+                double dR = c[flatR].U[s][var] - c[flat].U[s][var];
+                double dL = c[flat].U[s][var]  - c[flatL].U[s][var];
+                c[flat].dU[s][var] = 0.5 * MC(dL, dR);   // swap to van_leer or minmod as needed
+            }
+        }
+    }
+
+    // Z-slopes (only if N_dims == 3)
+    if (p.N_dims == 3)
+    {
+        for (int k = p.N_ghost - 1; k < g.Nz + p.N_ghost + 1; k++)
+        for (int j = 0; j < g.Ny; j++)
+        for (int i = 0; i < g.Nx; i++)
+        {
+            int flat  = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k    );
+            int flatL = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k - 1);
+            int flatR = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + 1);
+
+            for (size_t s = 0; s < c[flat].U.size(); ++s)
+            for (size_t var = 0; var < c[flat].U[s].size(); ++var)
+            {
+                double dR = c[flatR].U[s][var] - c[flat].U[s][var];
+                double dL = c[flat].U[s][var]  - c[flatL].U[s][var];
+                c[flat].dU[s][var] = 0.5 * MC(dL, dR);   // swap to van_leer or minmod as needed
             }
         }
     }
 }
 
+
 void reconstruct_cell_pair(Cell &Left, Cell &Right, int sign)
 {
-    for (size_t k = 0; k < Left.U.size(); ++k) {
-        for (size_t l = 0; l < Left.U[k].size(); ++l) {
-            Left.U[k][l] += Left.dU[k][l] * sign;
-            Right.U[k][l] -= Right.dU[k][l] * sign;
-        }
+    for (size_t s = 0; s < Left.U.size(); ++s)
+    for (size_t var = 0; var < Left.U[s].size(); ++var)
+    {
+        Left.U[s][var]  += Left.dU[s][var]  * sign;
+        Right.U[s][var] -= Right.dU[s][var] * sign;
     }
 
     Left.get_W_from_U();

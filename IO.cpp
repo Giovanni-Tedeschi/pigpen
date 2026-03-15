@@ -66,7 +66,12 @@ Params read_param(std::string fname)
                                       { return c == '\n' || c == '\r'; }),
                        p.output_dir.end());
 
-    p.L = configData.count("L") ? stof(configData["L"]) : 1.0;
+    p.L  = configData.count("L")  ? stof(configData["L"])  : 1.0;
+    p.Ly = configData.count("Ly") ? stof(configData["Ly"]) : p.L;
+    p.Lz = configData.count("Lz") ? stof(configData["Lz"]) : p.L;
+    p.N_cells   = configData.count("N_cells")   ? stoi(configData["N_cells"])   : -1;
+    p.N_cells_y = configData.count("N_cells_y") ? stoi(configData["N_cells_y"]) : -1;
+    p.N_cells_z = configData.count("N_cells_z") ? stoi(configData["N_cells_z"]) : -1;
     p.sound_speed = configData.count("sound_speed") ? stof(configData["sound_speed"]) : -1.0;
     p.RiemannSolver = configData.count("RiemannSolver") ? stoi(configData["RiemannSolver"]) : 1;
     p.apply_reconstruction = configData.count("apply_reconstruction") ? stoi(configData["apply_reconstruction"]) : 1;
@@ -85,111 +90,144 @@ Params read_param(std::string fname)
     return p;
 }
 
-std::vector<Cell> read_ic(Params &p)
+std::vector<Cell> read_ic(Params &p, Grid& g)
 {
-    std::vector<Cell> c;
-
     // Read the initial condition file
-    std::ifstream file;
-    file.open(p.input_file);
+    std::ifstream file(p.input_file);
 
-    std::string line;
     std::vector<double> temp_W;
+    std::string line;
     while (std::getline(file, line))
     {
         std::istringstream iss(line);
         double value;
         while (iss >> value)
-        {
             temp_W.push_back(value);
-        }
     }
-
     file.close();
 
-    // Determine N_cells
-    p.N_cells = temp_W.size() / p.N_vars;
-    if(p.ghost_in_input){
-        p.N_cells -= 2*p.N_ghost;
-    }
-    p.dx = p.L / p.N_cells;
-    c.resize(p.N_cells + 2*p.N_ghost);
+    // Determine N_cells per dimension from the flat input
+    int total_active_cells = temp_W.size() / p.N_vars;
+    if (p.ghost_in_input)
+        total_active_cells -= 2 * p.N_ghost * p.N_dims;
 
-    for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++)
+    if (p.N_cells < 0)
+        p.N_cells = (p.N_dims == 1) ? total_active_cells
+                  : (p.N_dims == 2) ? (int)round(sqrt((double)total_active_cells))
+                                    : (int)round(cbrt((double)total_active_cells));
+
+    if (p.N_cells_y < 0) p.N_cells_y = (p.N_dims >= 2) ? p.N_cells : 1;
+    if (p.N_cells_z < 0) p.N_cells_z = (p.N_dims == 3) ? p.N_cells : 1;
+
+    p.dx = p.L  / p.N_cells;
+    p.dy = p.Ly / p.N_cells_y;
+    p.dz = p.Lz / p.N_cells_z;
+
+    // Rebuild the grid now that we know N_cells
+    const_cast<Grid&>(g) = Grid(p);
+
+    // Allocate flat cell array
+    std::vector<Cell> c(g.size());
+
+    // Initialize all cells (including ghosts)
+    for (int k = 0; k < g.Nz_tot; k++)
+    for (int j = 0; j < g.Ny_tot; j++)
+    for (int i = 0; i < g.Nx_tot; i++)
     {
-        c[i].GAMMA = p.GAMMA;
-        c[i].sound_speed = p.sound_speed;
-        c[i].N_dust = p.N_dust;
-        c[i].N_dims = p.N_dims;
-        c[i].N_var_gas = p.N_var_gas;
-        c[i].N_var_dust = p.N_var_dust;
-        c[i].x_center = p.dx * (0.5 - p.N_ghost + i);
-        c[i].initialize();
+        int flat = g.flat_idx(i, j, k);
+        c[flat].GAMMA       = p.GAMMA;
+        c[flat].sound_speed = p.sound_speed;
+        c[flat].N_dust      = p.N_dust;
+        c[flat].N_dims      = p.N_dims;
+        c[flat].N_var_gas   = p.N_var_gas;
+        c[flat].N_var_dust  = p.N_var_dust;
+        c[flat].x_center    = p.dx * (0.5 - p.N_ghost + i);
+        c[flat].y_center    = p.dy * (0.5 - p.N_ghost + j);
+        c[flat].z_center    = p.dz * (0.5 - p.N_ghost + k);
+        c[flat].initialize();
     }
 
-
-    if(!p.ghost_in_input){
-        for (int i = 0; i < p.N_cells; i++)
+    // Fill active cells from temp_W
+    // Input ordering: k outer -> j -> i inner (row-major, matching flat index)
+    if (!p.ghost_in_input)
+    {
+        int input_cell = 0;
+        for (int k = 0; k < g.Nz; k++)
+        for (int j = 0; j < g.Ny; j++)
+        for (int i = 0; i < g.Nx; i++)
         {
-            for(int k=0; k<p.N_var_gas; k++){
-                c[i+p.N_ghost].W[0][k] = temp_W[i * p.N_vars + k];
-            }
-            
-            for(int j=1; j<=p.N_dust; j++){
-                for(int k=0; k<p.N_var_dust; k++){
-                    c[i+p.N_ghost].W[j][k] = temp_W[i * p.N_vars + p.N_var_gas + p.N_var_dust*(j-1) + k];
-                }
-            }
-            
-            c[i + p.N_ghost].get_U_from_W();
+            int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+
+            for (int var = 0; var < p.N_var_gas; var++)
+                c[flat].W[0][var] = temp_W[input_cell * p.N_vars + var];
+
+            for (int s = 1; s <= p.N_dust; s++)
+            for (int var = 0; var < p.N_var_dust; var++)
+                c[flat].W[s][var] = temp_W[input_cell * p.N_vars + p.N_var_gas + p.N_var_dust * (s - 1) + var];
+
+            c[flat].get_U_from_W();
+            input_cell++;
         }
 
-        apply_boundary_conditions(c, p);
-        
-    }else{
-        for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++)
+        apply_boundary_conditions(c, p, g);
+    }
+    else
+    {
+        int input_cell = 0;
+        for (int k = 0; k < g.Nz_tot; k++)
+        for (int j = 0; j < g.Ny_tot; j++)
+        for (int i = 0; i < g.Nx_tot; i++)
         {
-            for(int k=0; k<p.N_var_gas; k++){
-                c[i].W[0][k] = temp_W[i * p.N_vars + k];
-            }
-            
-            for(int j=1; j<=p.N_dust; j++){
-                for(int k=0; k<p.N_var_dust; k++){
-                    c[i].W[j][k] = temp_W[i * p.N_vars + p.N_var_gas + p.N_var_dust*(j-1) + k];
-                }
-            }
-            
-            c[i].get_U_from_W();
+            int flat = g.flat_idx(i, j, k);
+
+            for (int var = 0; var < p.N_var_gas; var++)
+                c[flat].W[0][var] = temp_W[input_cell * p.N_vars + var];
+
+            for (int s = 1; s <= p.N_dust; s++)
+            for (int var = 0; var < p.N_var_dust; var++)
+                c[flat].W[s][var] = temp_W[input_cell * p.N_vars + p.N_var_gas + p.N_var_dust * (s - 1) + var];
+
+            c[flat].get_U_from_W();
+            input_cell++;
         }
     }
 
     return c;
 }
 
-void write_output(std::vector<Cell> c, Params p, Vars &v)
+
+void write_output(std::vector<Cell> c, Params p, Vars &v, const Grid& g)
 {
     if (v.t - v.k_snap * p.dt_snap >= 0)
     {
         printf("%lf %d\n", v.t, v.k_snap);
         std::string output_file = p.output_dir + std::to_string(v.k_snap) + ".txt";
         std::ofstream fp(output_file, std::ios::out);
-        fp << std::scientific << std::setprecision(20); // 20 significant digits
-        
-        for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++)
-        {
-            for(int k=0; k<p.N_var_gas; k++){
-                fp << c[i].W[0][k] << " ";
-            }
+        fp << std::scientific << std::setprecision(20);
 
-            for(int j = 1; j <= p.N_dust; j++){
-                for(int k=0; k<p.N_var_dust; k++){
-                    fp << c[i].W[j][k] << " ";    
-                }
-            }
-            
-            fp << v.t << " ";
-            fp << "\n";
+        for (int k = 0; k < g.Nz; k++)
+        for (int j = 0; j < g.Ny; j++)
+        for (int i = 0; i < g.Nx; i++)
+        {
+            int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+
+            // Write gas variables
+            for (int var = 0; var < p.N_var_gas; var++)
+                fp << c[flat].W[0][var] << " ";
+
+            // Write dust variables
+            for (int s = 1; s <= p.N_dust; s++)
+            for (int var = 0; var < p.N_var_dust; var++)
+                fp << c[flat].W[s][var] << " ";
+
+            // Write cell center coordinates
+            fp << c[flat].x_center << " ";
+            if (p.N_dims >= 2) fp << c[flat].y_center << " ";
+            if (p.N_dims == 3) fp << c[flat].z_center << " ";
+
+            fp << v.t << "\n";
         }
+
         v.k_snap += 1;
         fp.close();
     }

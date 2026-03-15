@@ -6,6 +6,99 @@
 #include <sstream>
 #include "indices.h"
 
+
+class Params{
+    public:
+        double CFL;
+        double GAMMA;
+        double sound_speed;
+        double t_max;
+        double dt_snap;
+        double L;
+        double Ly;
+        double Lz;
+        double dx;
+        double dy;
+        double dz;
+        double const_dt;
+        double BC;
+        int ghost_in_input;
+        int RiemannSolver;
+        int N_cells;
+        int N_cells_y;
+        int N_cells_z;
+        int N_ghost;
+        int N_dims;
+        int N_dust;
+        int N_var_gas;
+        int N_var_dust;
+        int N_vars;
+        int DragIntegrator;
+        int apply_reconstruction;
+        double g0;
+        double Omega0;
+        double q;
+        std::vector<double> K;
+        std::string input_file;
+        std::string output_dir;
+};
+
+class Vars{
+    public:
+        double t;
+        double dt;
+        int k_snap;
+
+        Vars(){
+            t = 0.;
+            dt = 1e-3;
+            k_snap = 0;
+        }
+};
+
+
+struct Grid {
+    int Nx, Ny, Nz;   // number of active cells per dimension
+    int Ng;            // number of ghost cells
+    int N_dims;
+
+    // Total cells including ghosts per dimension
+    int Nx_tot, Ny_tot, Nz_tot;
+
+    Grid() : Nx(0), Ny(1), Nz(1), Ng(0), N_dims(1),
+             Nx_tot(0), Ny_tot(1), Nz_tot(1) {}  // safe zero-init
+
+    Grid(const Params& p) {
+        Ng     = p.N_ghost;
+        N_dims = p.N_dims;
+        Nx     = p.N_cells;
+        Ny     = (N_dims >= 2) ? p.N_cells_y : 1;
+        Nz     = (N_dims == 3) ? p.N_cells_z : 1;
+        Nx_tot = Nx + 2 * Ng;
+        Ny_tot = (N_dims >= 2) ? Ny + 2 * Ng : 1;
+        Nz_tot = (N_dims == 3) ? Nz + 2 * Ng : 1;
+    }
+
+    // Convert (i, j, k) including ghosts to flat index
+    inline int flat_idx(int i, int j = 0, int k = 0) const {
+        int jj = (N_dims >= 2) ? j : 0;
+        int kk = (N_dims == 3) ? k : 0;
+        return i + Nx_tot * (jj + Ny_tot * kk);
+    }
+
+    // Total size of the flat array
+    inline int size() const {
+        return Nx_tot * Ny_tot * Nz_tot;
+    }
+
+    // Check if (i,j,k) is an active (non-ghost) cell
+    inline bool is_active(int i, int j = 0, int k = 0) const {
+        return i >= Ng && i < Nx + Ng &&
+               j >= Ng && j < Ny + Ng &&
+               k >= Ng && k < Nz + Ng;
+    }
+};
+
 class Cell{
     public:
         std::vector<std::vector<double>> W;
@@ -29,6 +122,8 @@ class Cell{
         int N_var_gas;
         int N_var_dust;
         double x_center;
+        double y_center;
+        double z_center;
 
         Cell& operator=(const Cell& other) {
             if (this != &other) {  // Prevent self-assignment
@@ -207,48 +302,6 @@ class Cell{
         }
 };
 
-class Params{
-    public:
-        double CFL;
-        double GAMMA;
-        double sound_speed;
-        double t_max;
-        double dt_snap;
-        double L;
-        double dx;
-        double const_dt;
-        double BC;
-        int ghost_in_input;
-        int RiemannSolver;
-        int N_cells;
-        int N_ghost;
-        int N_dims;
-        int N_dust;
-        int N_var_gas;
-        int N_var_dust;
-        int N_vars;
-        int DragIntegrator;
-        int apply_reconstruction;
-        double g0;
-        double Omega0;
-        double q;
-        std::vector<double> K;
-        std::string input_file;
-        std::string output_dir;
-};
-
-class Vars{
-    public:
-        double t;
-        double dt;
-        int k_snap;
-
-        Vars(){
-            t = 0.;
-            dt = 1e-3;
-            k_snap = 0;
-        }
-};
 
 
 #endif // CELL_H

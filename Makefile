@@ -1,6 +1,6 @@
 # Makefile 
 CXX = g++
-CXXFLAGS = -std=c++17 -O2 
+CXXFLAGS = -std=c++17 -O7
 
 SRCS = run.cpp RiemannSolvers.cpp IO.cpp DragIntegrators.cpp BoundaryConditions.cpp Reconstruction.cpp
 OBJS = run.o RiemannSolvers.o IO.o DragIntegrators.o BoundaryConditions.o Reconstruction.o 

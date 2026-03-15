@@ -90,9 +90,10 @@ void RK_K(Cell &c, Params p, double dt, double gamma1, double gamma2, double bet
     if(p.N_dims >= 2){
         c.K1[0][idx.vy] = (-G1y*N2 + H1*N2*c.U[0][idx.vy] + beta1*dt*L1*(G2y-H2*c.U[0][idx.vy])) / (beta1*beta2*dt*dt*L1*L2 - N1*N2);
         c.K2[0][idx.vy] = (G2y - c.U[0][idx.vy]*H2 - c.K1[0][idx.vy]*beta2*dt*L2)/N2;
-        idust = 0.;
         for(int j=0; j<p.N_dust;j++){
             idust = j+1;
+            eps = c.U[idust][idx.rho]/c.U[0][idx.rho];
+            lambda = 1. / (1. + c.alpha[j]*dt*(gamma1 + gamma2 + c.alpha[j]*dt*(gamma1*gamma2 - beta1*beta2)));
             c.K1[idust][idx.vy] = c.alpha[j]*lambda*((c.U[0][idx.vy]*eps - c.U[idust][idx.vy])*(1.+c.alpha[j]*dt*(gamma2-beta1)) + c.K1[0][idx.vy]*eps*dt*(gamma1+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K2[0][idx.vy]*eps*dt*beta1);
             c.K2[idust][idx.vy] = c.alpha[j]*lambda*((c.U[0][idx.vy]*eps - c.U[idust][idx.vy])*(1.+c.alpha[j]*dt*(gamma1-beta2)) + c.K2[0][idx.vy]*eps*dt*(gamma2+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K1[0][idx.vy]*eps*dt*beta2);
         }
@@ -101,93 +102,104 @@ void RK_K(Cell &c, Params p, double dt, double gamma1, double gamma2, double bet
     if(p.N_dims == 3){
         c.K1[0][idx.vz] = (-G1z*N2 + H1*N2*c.U[0][idx.vz] + beta1*dt*L1*(G2z-H2*c.U[0][idx.vz])) / (beta1*beta2*dt*dt*L1*L2 - N1*N2);
         c.K2[0][idx.vz] = (G2z - c.U[0][idx.vz]*H2 - c.K1[0][idx.vz]*beta2*dt*L2)/N2;
-        idust = 0.;
         for(int j=0; j<p.N_dust;j++){
             idust = j+1;
+            eps = c.U[idust][idx.rho]/c.U[0][idx.rho];
+            lambda = 1. / (1. + c.alpha[j]*dt*(gamma1 + gamma2 + c.alpha[j]*dt*(gamma1*gamma2 - beta1*beta2)));
             c.K1[idust][idx.vz] = c.alpha[j]*lambda*((c.U[0][idx.vz]*eps - c.U[idust][idx.vz])*(1.+c.alpha[j]*dt*(gamma2-beta1)) + c.K1[0][idx.vz]*eps*dt*(gamma1+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K2[0][idx.vz]*eps*dt*beta1);
             c.K2[idust][idx.vz] = c.alpha[j]*lambda*((c.U[0][idx.vz]*eps - c.U[idust][idx.vz])*(1.+c.alpha[j]*dt*(gamma1-beta2)) + c.K2[0][idx.vz]*eps*dt*(gamma2+c.alpha[j]*dt*(gamma1*gamma2-beta1*beta2)) + c.K1[0][idx.vz]*eps*dt*beta2);
         }
     }
 }
 
-void integrate_drag_RK(std::vector<Cell> &c, Params p, double dt)
+void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 {
+    // Find max stopping time across all active cells
     double ts_i;
     double ts_max = 0.;
-    for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++)
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
     {
-        for(int j = 1; j <= p.N_dust; j++){
-            ts_i = c[i].U[j][idx.rho] / p.K[j-1];
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+        for (int s = 1; s <= p.N_dust; s++)
+        {
+            ts_i = c[flat].U[s][idx.rho] / p.K[s-1];
             ts_max = std::max(ts_max, ts_i);
         }
     }
 
-    double gamma1;
-    double gamma2;
-    double beta1;
-    double beta2;
-    double b;
-    
-    if(p.DragIntegrator == 1){
+    double gamma1, gamma2, beta1, beta2, b;
+
+    if (p.DragIntegrator == 1)
+    {
         // PARAMETERS FOR DHD
-        if(dt <= ts_max){
+        if (dt <= ts_max)
+        {
             gamma1 = 1.0;
             gamma2 = 0.0;
             b = 1.;
             beta1 = 0.5 - gamma1;
-            beta2 = (1. - 3.*gamma1 - 3.*gamma2 + 6.*gamma1*gamma2)/(3. - 6.*gamma1); 
-            
-        }else{
+            beta2 = (1. - 3.*gamma1 - 3.*gamma2 + 6.*gamma1*gamma2) / (3. - 6.*gamma1);
+        }
+        else
+        {
             gamma1 = 1.0;
             b = 0.;
             beta2 = gamma1 - 2.;
             gamma2 = 2. - gamma1;
-            beta1 = (2. - 2.*gamma1 + gamma1*gamma1)/(2.-gamma1);
+            beta1 = (2. - 2.*gamma1 + gamma1*gamma1) / (2. - gamma1);
         }
-
-    }else{
-        // PARAMETERS FOR DHDHD      
-        if(dt <= ts_max){
+    }
+    else
+    {
+        // PARAMETERS FOR DHDHD
+        if (dt <= ts_max)
+        {
             gamma1 = 1.0;
             gamma2 = 0.0;
             b = 1.;
             beta1 = 0.5 - gamma1;
-            beta2 = (1. - 3.*gamma1 - 3.*gamma2 + 6.*gamma1*gamma2)/(3. - 6.*gamma1); 
-        }else{
+            beta2 = (1. - 3.*gamma1 - 3.*gamma2 + 6.*gamma1*gamma2) / (3. - 6.*gamma1);
+        }
+        else
+        {
             gamma1 = 1.0;
             b = 1.;
             beta1 = -1. - gamma1;
             gamma2 = 3. - gamma1;
-            beta2 = (4. - 3.* gamma1 + pow(gamma1,2))/(1. + gamma1);
+            beta2 = (4. - 3.*gamma1 + pow(gamma1, 2)) / (1. + gamma1);
         }
     }
 
-    for (int i = 0; i < p.N_cells + 2*p.N_ghost; i++){
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
+    {
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
 
-        RK_K(c[i], p, dt, gamma1, gamma2, beta1, beta2);
+        RK_K(c[flat], p, dt, gamma1, gamma2, beta1, beta2);
 
-        c[i].U[0][idx.vx] += b * dt * c[i].K1[0][idx.vx] + (1.-b) * dt * c[i].K2[0][idx.vx];
-        for(int j = 1; j <= p.N_dust; j++){
-            c[i].U[j][idx.vx] += b * dt * c[i].K1[j][idx.vx] + (1.-b) * dt * c[i].K2[j][idx.vx];
+        c[flat].U[0][idx.vx] += b * dt * c[flat].K1[0][idx.vx] + (1.-b) * dt * c[flat].K2[0][idx.vx];
+        for (int s = 1; s <= p.N_dust; s++)
+            c[flat].U[s][idx.vx] += b * dt * c[flat].K1[s][idx.vx] + (1.-b) * dt * c[flat].K2[s][idx.vx];
+
+        if (p.N_dims >= 2)
+        {
+            c[flat].U[0][idx.vy] += b * dt * c[flat].K1[0][idx.vy] + (1.-b) * dt * c[flat].K2[0][idx.vy];
+            for (int s = 1; s <= p.N_dust; s++)
+                c[flat].U[s][idx.vy] += b * dt * c[flat].K1[s][idx.vy] + (1.-b) * dt * c[flat].K2[s][idx.vy];
         }
 
-        if(p.N_dims >= 2){
-            c[i].U[0][idx.vy] += b * dt * c[i].K1[0][idx.vy] + (1.-b) * dt * c[i].K2[0][idx.vy];
-            for(int j = 1; j <= p.N_dust; j++){
-                c[i].U[j][idx.vy] += b * dt * c[i].K1[j][idx.vy] + (1.-b) * dt * c[i].K2[j][idx.vy];
-            }
+        if (p.N_dims == 3)
+        {
+            c[flat].U[0][idx.vz] += b * dt * c[flat].K1[0][idx.vz] + (1.-b) * dt * c[flat].K2[0][idx.vz];
+            for (int s = 1; s <= p.N_dust; s++)
+                c[flat].U[s][idx.vz] += b * dt * c[flat].K1[s][idx.vz] + (1.-b) * dt * c[flat].K2[s][idx.vz];
         }
 
-        if(p.N_dims == 3){
-            c[i].U[0][idx.vz] += b * dt * c[i].K1[0][idx.vz] + (1.-b) * dt * c[i].K2[0][idx.vz];
-            for(int j = 1; j <= p.N_dust; j++){
-                c[i].U[j][idx.vz] += b * dt * c[i].K1[j][idx.vz] + (1.-b) * dt * c[i].K2[j][idx.vz];
-            }
-        }
-
-        c[i].get_W_from_U();
+        c[flat].get_W_from_U();
     }
-
 }
 
 void MDIRK_K(Cell &c, Params p, double dt, double gamma){
@@ -212,94 +224,112 @@ void MDIRK_K(Cell &c, Params p, double dt, double gamma){
     }
 }
 
-void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, double dt)
-{
-    compute_fluxes(c, p);
 
-    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++){      
-        for(int l=0; l<3; l++){
-            c[i].Un[0][l] = c[i].U[0][l];    
-            c[i].Ln[0][l] = (c[i].FL[0][l] - c[i].FR[0][l]) / p.dx;     
-        } 
-        for(int j = 1; j <= p.N_dust; j++){
-            for(int l=0; l<2; l++){
-                c[i].Un[j][l] = c[i].U[j][l];
-                c[i].Ln[j][l] = (c[i].FL[j][l] - c[i].FR[j][l]) / p.dx;    
-            }
+void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
+{
+    compute_fluxes(c, p, g);
+
+    // Save state and compute L operator for all active cells
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
+    {
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+
+        for (int var = 0; var < p.N_var_gas; var++)
+        {
+            c[flat].Un[0][var] = c[flat].U[0][var];
+            c[flat].Ln[0][var] = (c[flat].FL[0][var] - c[flat].FR[0][var]) / p.dx;
+        }
+        for (int s = 1; s <= p.N_dust; s++)
+        for (int var = 0; var < p.N_var_dust; var++)
+        {
+            c[flat].Un[s][var] = c[flat].U[s][var];
+            c[flat].Ln[s][var] = (c[flat].FL[s][var] - c[flat].FR[s][var]) / p.dx;
         }
     }
-    
+
+    // Find max stopping time
     double ts_i;
     double ts_max = 0.;
-    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++)
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
     {
-        for(int j = 1; j <= p.N_dust; j++){
-            ts_i = (c[i].U[0][0] * c[i].U[j][0]) / (p.K[j-1] * (c[i].U[0][0] + c[i].U[j][0]));
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+        for (int s = 1; s <= p.N_dust; s++)
+        {
+            ts_i = (c[flat].U[0][idx.rho] * c[flat].U[s][idx.rho])
+                 / (p.K[s-1] * (c[flat].U[0][idx.rho] + c[flat].U[s][idx.rho]));
             ts_max = std::max(ts_max, ts_i);
         }
     }
-    
+
     double gamma = 0.5;
-    if(dt < ts_max){
-        gamma = 1 - 1./sqrt(2);
-    }
-    
-    double beta = 1. - gamma;
-    double b2 = gamma;
+    if (dt < ts_max)
+        gamma = 1. - 1./sqrt(2.);
+
+    double beta  = 1. - gamma;
+    double b2    = gamma;
     double delta = 1. - 1./(2.*gamma);
-    
-    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++){
-        for(int l=0; l<3; l++){
-            c[i].U[0][l] +=  gamma * dt * (c[i].FL[0][l] - c[i].FR[0][l]) / p.dx;    
-        } 
-        for(int j = 1; j <= p.N_dust; j++){
-            for(int l=0; l<2; l++){
-                c[i].U[j][l] +=  gamma * dt * (c[i].FL[j][l] - c[i].FR[j][l]) / p.dx;
-            }
-        }
-            
-        c[i].U[0][1] += gamma * dt * p.g0;
-    
-        MDIRK_K(c[i], p, dt, gamma);
-    
-        for(int l=0; l<3; l++){
-            c[i].U[0][l] +=  gamma * dt * c[i].K[0][l];
-        } 
-        for(int j = 1; j <= p.N_dust; j++){
-            for(int l=0; l<2; l++){
-                c[i].U[j][l] += gamma * dt * c[i].K[j][l];
-            }
-        }
-    
-        c[i].get_W_from_U();
+
+    // First MDIRK stage
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
+    {
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+
+        for (int var = 0; var < p.N_var_gas; var++)
+            c[flat].U[0][var] += gamma * dt * (c[flat].FL[0][var] - c[flat].FR[0][var]) / p.dx;
+        for (int s = 1; s <= p.N_dust; s++)
+        for (int var = 0; var < p.N_var_dust; var++)
+            c[flat].U[s][var] += gamma * dt * (c[flat].FL[s][var] - c[flat].FR[s][var]) / p.dx;
+
+        c[flat].U[0][idx.vx] += gamma * dt * p.g0;
+
+        MDIRK_K(c[flat], p, dt, gamma);
+
+        for (int var = 0; var < p.N_var_gas; var++)
+            c[flat].U[0][var] += gamma * dt * c[flat].K[0][var];
+        for (int s = 1; s <= p.N_dust; s++)
+        for (int var = 0; var < p.N_var_dust; var++)
+            c[flat].U[s][var] += gamma * dt * c[flat].K[s][var];
+
+        c[flat].get_W_from_U();
     }
-    
-    compute_fluxes(c, p);
-    
-    for (int i = p.N_ghost; i < p.N_cells + p.N_ghost; i++){
-    
-        for(int l=0; l<3; l++){
-            c[i].U[0][l] = c[i].Un[0][l] + (1-delta)*dt*(c[i].FL[0][l] - c[i].FR[0][l])/p.dx + delta*dt*c[i].Ln[0][l] + beta * dt * c[i].K[0][l];
-        } 
-        for(int j = 1; j <= p.N_dust; j++){
-            for(int l=0; l<2; l++){
-                c[i].U[j][l] = c[i].Un[j][l] + (1-delta)*dt*(c[i].FL[j][l] - c[i].FR[j][l])/p.dx + delta*dt*c[i].Ln[j][l] + beta * dt * c[i].K[j][l];
-            }
-        }
-    
-        c[i].U[0][1] += dt * p.g0;
-    
-        MDIRK_K(c[i], p, dt, gamma);
-    
-        for(int l=0; l<3; l++){
-            c[i].U[0][l] +=  b2 * dt * c[i].K[0][l];
-        } 
-        for(int j = 1; j <= p.N_dust; j++){
-            for(int l=0; l<2; l++){
-                c[i].U[j][l] += b2 * dt * c[i].K[j][l];
-            }
-        }
-    
-        c[i].get_W_from_U();
+
+    compute_fluxes(c, p, g);
+
+    // Second MDIRK stage
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
+    {
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+
+        for (int var = 0; var < p.N_var_gas; var++)
+            c[flat].U[0][var] = c[flat].Un[0][var]
+                              + (1.-delta) * dt * (c[flat].FL[0][var] - c[flat].FR[0][var]) / p.dx
+                              + delta * dt * c[flat].Ln[0][var]
+                              + beta * dt * c[flat].K[0][var];
+        for (int s = 1; s <= p.N_dust; s++)
+        for (int var = 0; var < p.N_var_dust; var++)
+            c[flat].U[s][var] = c[flat].Un[s][var]
+                              + (1.-delta) * dt * (c[flat].FL[s][var] - c[flat].FR[s][var]) / p.dx
+                              + delta * dt * c[flat].Ln[s][var]
+                              + beta * dt * c[flat].K[s][var];
+
+        c[flat].U[0][idx.vx] += dt * p.g0;
+
+        MDIRK_K(c[flat], p, dt, gamma);
+
+        for (int var = 0; var < p.N_var_gas; var++)
+            c[flat].U[0][var] += b2 * dt * c[flat].K[0][var];
+        for (int s = 1; s <= p.N_dust; s++)
+        for (int var = 0; var < p.N_var_dust; var++)
+            c[flat].U[s][var] += b2 * dt * c[flat].K[s][var];
+
+        c[flat].get_W_from_U();
     }
 }
