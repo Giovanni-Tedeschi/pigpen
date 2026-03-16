@@ -115,8 +115,9 @@ void RK_K(Cell &c, Params p, double dt, double gamma1, double gamma2, double bet
 void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 {
     // Find max stopping time across all active cells
-    double ts_i;
     double ts_max = 0.;
+
+    #pragma omp parallel for collapse(3) schedule(static) reduction(max:ts_max)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -124,7 +125,7 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
         int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
         for (int s = 1; s <= p.N_dust; s++)
         {
-            ts_i = c[flat].U[s][idx.rho] / p.K[s-1];
+            double ts_i = c[flat].U[s][idx.rho] / p.K[s-1];
             ts_max = std::max(ts_max, ts_i);
         }
     }
@@ -172,6 +173,7 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
         }
     }
 
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -230,6 +232,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, const Grid& g, double 
     compute_fluxes(c, p, g);
 
     // Save state and compute L operator for all active cells
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -250,8 +253,9 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, const Grid& g, double 
     }
 
     // Find max stopping time
-    double ts_i;
     double ts_max = 0.;
+
+    #pragma omp parallel for collapse(3) schedule(static) reduction(max:ts_max)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -259,7 +263,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, const Grid& g, double 
         int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
         for (int s = 1; s <= p.N_dust; s++)
         {
-            ts_i = (c[flat].U[0][idx.rho] * c[flat].U[s][idx.rho])
+            double ts_i = (c[flat].U[0][idx.rho] * c[flat].U[s][idx.rho])
                  / (p.K[s-1] * (c[flat].U[0][idx.rho] + c[flat].U[s][idx.rho]));
             ts_max = std::max(ts_max, ts_i);
         }
@@ -274,6 +278,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, const Grid& g, double 
     double delta = 1. - 1./(2.*gamma);
 
     // First MDIRK stage
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -302,6 +307,7 @@ void integrate_drag_MDIRK(std::vector<Cell> &c, Params p, const Grid& g, double 
     compute_fluxes(c, p, g);
 
     // Second MDIRK stage
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)

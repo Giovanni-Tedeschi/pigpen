@@ -21,6 +21,7 @@
 
 void integrate_external_force(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 {
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -57,6 +58,7 @@ void integrate_external_force(std::vector<Cell> &c, Params p, const Grid& g, dou
 
 void update_variables(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 {
+    #pragma omp parallel for collapse(3) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = 0; i < g.Nx; i++)
@@ -71,12 +73,13 @@ void update_variables(std::vector<Cell> &c, Params p, const Grid& g, double dt)
     }
 }
 
-void find_dt(std::vector<Cell> c, Params p, const Grid& g, Vars &v)
+void find_dt(const std::vector<Cell> &c, Params p, const Grid& g, Vars &v)
 {
     if (p.const_dt < 0.)
     {
         double max_sig_vel = 1e-40;
 
+        #pragma omp parallel for collapse(3) schedule(static) reduction(max:max_sig_vel)
         for (int k = 0; k < g.Nz; k++)
         for (int j = 0; j < g.Ny; j++)
         for (int i = 0; i < g.Nx; i++)
@@ -100,6 +103,7 @@ void find_dt(std::vector<Cell> c, Params p, const Grid& g, Vars &v)
 
 void save_old_state(std::vector<Cell> &c, const Grid& g)
 {
+    #pragma omp parallel for schedule(static)
     for (int flat = 0; flat < g.size(); flat++)
     for (size_t s = 0; s < c[flat].U.size(); ++s)
     for (size_t var = 0; var < c[flat].U[s].size(); ++var)

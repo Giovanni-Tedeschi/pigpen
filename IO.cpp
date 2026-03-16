@@ -196,7 +196,7 @@ std::vector<Cell> read_ic(Params &p, Grid& g)
 }
 
 
-void write_output(std::vector<Cell> c, Params p, Vars &v, const Grid& g)
+void write_output(const std::vector<Cell> &c, Params p, Vars &v, const Grid& g)
 {
     if (v.t - v.k_snap * p.dt_snap >= 0)
     {

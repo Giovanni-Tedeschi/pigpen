@@ -1,6 +1,7 @@
 # Makefile 
 CXX = g++
-CXXFLAGS = -std=c++17 -O7
+CXXFLAGS = -std=c++17 -O7 -fopenmp
+LDFLAGS  += -fopenmp
 
 SRCS = run.cpp RiemannSolvers.cpp IO.cpp DragIntegrators.cpp BoundaryConditions.cpp Reconstruction.cpp
 OBJS = run.o RiemannSolvers.o IO.o DragIntegrators.o BoundaryConditions.o Reconstruction.o 
@@ -13,7 +14,7 @@ all: $(TARGET)
 
 # Link object files to create the executable
 $(TARGET): $(OBJS)
-	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS)
+	$(CXX) $(CXXFLAGS) -o $(TARGET) $(OBJS) $(LDFLAGS)
 
 # Pattern rule for compiling .cpp files to .o files
 %.o: %.cpp $(HEADERS)

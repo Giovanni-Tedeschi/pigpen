@@ -99,9 +99,50 @@ struct Grid {
     }
 };
 
+
+
+
+static constexpr int MAX_VARS = 5;   // rho, vx, vy, vz, P
+
+struct VarArray {
+    double data[MAX_VARS] = {};
+    int    _size          = 0;
+
+    void resize(int n)            { _size = n; }
+    int  size()  const            { return _size; }
+
+    double&       operator[](int i)       { return data[i]; }
+    const double& operator[](int i) const { return data[i]; }
+
+    // range-for support
+    double*       begin()       { return data; }
+    double*       end()         { return data + _size; }
+    const double* begin() const { return data; }
+    const double* end()   const { return data + _size; }
+};
+
+// ── Drop-in replacement for std::vector<VarArray> ────────────────────────────
+static constexpr int MAX_DUST = 8;   // max dust species supported
+
+struct SpeciesArray {
+    VarArray data[MAX_DUST + 1] = {};
+    int      _size              = 0;
+
+    void resize(int n)                  { _size = n; }
+    int  size()  const                  { return _size; }
+
+    VarArray&       operator[](int i)       { return data[i]; }
+    const VarArray& operator[](int i) const { return data[i]; }
+};
+
+
+
 class Cell{
     public:
-        std::vector<std::vector<double>> W;
+        SpeciesArray W, U, Uold, dU, dW, F, FL, FR, K1, K2, K, Ln, Un;
+        VarArray alpha;
+        
+        /*std::vector<std::vector<double>> W;
         std::vector<std::vector<double>> U;
         std::vector<std::vector<double>> Uold;
         std::vector<std::vector<double>> dU;
@@ -114,7 +155,7 @@ class Cell{
         std::vector<std::vector<double>> K;
         std::vector<std::vector<double>> Ln;
         std::vector<std::vector<double>> Un;
-        std::vector<double> alpha;
+        std::vector<double> alpha;*/
         double GAMMA;
         double sound_speed;
         int N_dust;
@@ -125,7 +166,7 @@ class Cell{
         double y_center;
         double z_center;
 
-        Cell& operator=(const Cell& other) {
+        /*Cell& operator=(const Cell& other) {
             if (this != &other) {  // Prevent self-assignment
                 // Copy all member variables
                 W = other.W;
@@ -133,7 +174,7 @@ class Cell{
                 F = other.F;
             }
             return *this;
-        }
+        }*/
 
         void initialize() {
             alpha.resize(N_dust);
@@ -277,7 +318,7 @@ class Cell{
             
         }
 
-        double get_SoundSpeed2(){
+        double get_SoundSpeed2() const {
             if(sound_speed < 0.){
                 return GAMMA*W[0][idx.P]/W[0][idx.rho];
             }else{
@@ -285,7 +326,7 @@ class Cell{
             }
         }
 
-        double get_vsig(){
+        double get_vsig() const {
             double v2 = W[0][idx.vx] * W[0][idx.vx];
             if (N_dims >= 2) v2 += W[0][idx.vy] * W[0][idx.vy];
             if (N_dims == 3) v2 += W[0][idx.vz] * W[0][idx.vz];

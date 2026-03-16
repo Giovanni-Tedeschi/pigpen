@@ -4,6 +4,7 @@
 #include "Reconstruction.h"
 #include <algorithm>
 #include <cmath>
+#include <omp.h>
 
 
 void swap_xy(Cell &c)
@@ -44,113 +45,135 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
 {
     if (p.apply_reconstruction == 1) compute_slopes(c, p, g);
 
+    // Pre-allocate one cL/cR pair per thread — reused every iteration, no per-call heap alloc
+    // Use a representative active cell to get the right sizes
+    int ref = g.flat_idx(p.N_ghost, p.N_ghost, p.N_ghost);
+    int nthreads;
+    #pragma omp parallel
+    {
+        #pragma omp single
+        nthreads = omp_get_num_threads();
+    }
+    std::vector<Cell> cL(nthreads, c[ref]);
+    std::vector<Cell> cR(nthreads, c[ref]);
+
     // ---- X-sweep ----
+    #pragma omp parallel for collapse(2) schedule(static)
     for (int k = 0; k < g.Nz; k++)
     for (int j = 0; j < g.Ny; j++)
     for (int i = p.N_ghost - 1; i < g.Nx + p.N_ghost; i++)
     {
+        int tid  = omp_get_thread_num();
         int flatL = g.flat_idx(i,     (p.N_dims >= 2) ? j + p.N_ghost : 0, (p.N_dims == 3) ? k + p.N_ghost : 0);
         int flatR = g.flat_idx(i + 1, (p.N_dims >= 2) ? j + p.N_ghost : 0, (p.N_dims == 3) ? k + p.N_ghost : 0);
+        
+        cL[tid] = c[flatL];
+        cR[tid] = c[flatR];
 
-        Cell cL = c[flatL];   // work on copies
-        Cell cR = c[flatR];
-
-        if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL, cR, 1);
+        if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
 
         if (p.RiemannSolver == 0)
-            get_exact_flux(cL, cR, p.GAMMA);
+            get_exact_flux(cL[tid], cR[tid], p.GAMMA);
+        else if (p.RiemannSolver == 1)
+            get_hllc_flux(cL[tid], cR[tid], p.GAMMA);
         else
-            get_hll_flux(cL, cR);
+            get_hll_flux(cL[tid], cR[tid]);
 
-        get_dust_flux(cL, cR);
+        get_dust_flux(cL[tid], cR[tid]);
 
         // Write fluxes back to original cells
-        c[flatL].FR = cL.FR;
-        c[flatR].FL = cR.FL;
+        c[flatL].FR = cL[tid].FR;
+        c[flatR].FL = cR[tid].FL;
     }
 
     // ---- Y-sweep (only if N_dims >= 2) ----
     if (p.N_dims >= 2)
     {
+        #pragma omp parallel for collapse(2) schedule(static)
         for (int k = 0; k < g.Nz; k++)
-        for (int j = p.N_ghost - 1; j < g.Ny + p.N_ghost; j++)
         for (int i = 0; i < g.Nx; i++)
+        for (int j = p.N_ghost - 1; j < g.Ny + p.N_ghost; j++)
         {
+            int tid  = omp_get_thread_num();
             int flatL = g.flat_idx(i + p.N_ghost, j,     (p.N_dims == 3) ? k + p.N_ghost : 0);
             int flatR = g.flat_idx(i + p.N_ghost, j + 1, (p.N_dims == 3) ? k + p.N_ghost : 0);
-
-            Cell cL = c[flatL];   // work on copies
-            Cell cR = c[flatR];
+            
+            cL[tid] = c[flatL];   // work on copies
+            cR[tid] = c[flatR];
 
             // Swap vx <-> vy on copies only
-            swap_xy(cL);
-            swap_xy(cR);
+            swap_xy(cL[tid]);
+            swap_xy(cR[tid]);
 
             // Slopes were computed in original orientation -- swap dU too
-            for (size_t s = 0; s < cL.dU.size(); ++s)
-                std::swap(cL.dU[s][idx.vx], cL.dU[s][idx.vy]);
-            for (size_t s = 0; s < cR.dU.size(); ++s)
-                std::swap(cR.dU[s][idx.vx], cR.dU[s][idx.vy]);
+            for (size_t s = 0; s < cL[tid].dU.size(); ++s)
+                std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vy]);
+            for (size_t s = 0; s < cR[tid].dU.size(); ++s)
+                std::swap(cR[tid].dU[s][idx.vx], cR[tid].dU[s][idx.vy]);
 
-            if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL, cR, 1);
+            if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
 
             if (p.RiemannSolver == 0)
-                get_exact_flux(cL, cR, p.GAMMA);
+                get_exact_flux(cL[tid], cR[tid], p.GAMMA);
+            else if (p.RiemannSolver == 1)
+                get_hllc_flux(cL[tid], cR[tid], p.GAMMA);
             else
-                get_hll_flux(cL, cR);
+                get_hll_flux(cL[tid], cR[tid]);
 
-            get_dust_flux(cL, cR);
+            get_dust_flux(cL[tid], cR[tid]);
 
             // Swap fluxes back before storing
-            for (size_t s = 0; s < cL.FR.size(); ++s)
-                std::swap(cL.FR[s][idx.vx], cL.FR[s][idx.vy]);
-            for (size_t s = 0; s < cR.FL.size(); ++s)
-                std::swap(cR.FL[s][idx.vx], cR.FL[s][idx.vy]);
+            for (size_t s = 0; s < cL[tid].FR.size(); ++s)
+                std::swap(cL[tid].FR[s][idx.vx], cL[tid].FR[s][idx.vy]);
+            for (size_t s = 0; s < cR[tid].FL.size(); ++s)
+                std::swap(cR[tid].FL[s][idx.vx], cR[tid].FL[s][idx.vy]);
 
-            c[flatL].FR = cL.FR;
-            c[flatR].FL = cR.FL;
+            c[flatL].FR = cL[tid].FR;
+            c[flatR].FL = cR[tid].FL;
         }
     }
 
     // ---- Z-sweep (only if N_dims == 3) ----
     if (p.N_dims == 3)
     {
-        for (int k = p.N_ghost - 1; k < g.Nz + p.N_ghost; k++)
+        #pragma omp parallel for collapse(2) schedule(static)
         for (int j = 0; j < g.Ny; j++)
         for (int i = 0; i < g.Nx; i++)
+        for (int k = p.N_ghost - 1; k < g.Nz + p.N_ghost; k++)
         {
+            int tid  = omp_get_thread_num();
             int flatL = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k    );
             int flatR = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + 1);
 
-            Cell cL = c[flatL];
-            Cell cR = c[flatR];
+            cL[tid] = c[flatL];
+            cR[tid] = c[flatR];
 
-            swap_xz(cL);
-            swap_xz(cR);
+            swap_xz(cL[tid]);
+            swap_xz(cR[tid]);
 
-            for (size_t s = 0; s < cL.dU.size(); ++s)
-                std::swap(cL.dU[s][idx.vx], cL.dU[s][idx.vz]);
-            for (size_t s = 0; s < cR.dU.size(); ++s)
-                std::swap(cR.dU[s][idx.vx], cR.dU[s][idx.vz]);
+            for (size_t s = 0; s < cL[tid].dU.size(); ++s)
+                std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vz]);
+            for (size_t s = 0; s < cR[tid].dU.size(); ++s)
+                std::swap(cR[tid].dU[s][idx.vx], cR[tid].dU[s][idx.vz]);
 
-            if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL, cR, 1);
+            if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
 
             if (p.RiemannSolver == 0)
-                get_exact_flux(cL, cR, p.GAMMA);
+                get_exact_flux(cL[tid], cR[tid], p.GAMMA);
             else if (p.RiemannSolver == 1)
-                get_hllc_flux(cL, cR, p.GAMMA);
+                get_hllc_flux(cL[tid], cR[tid], p.GAMMA);
             else
-                get_hll_flux(cL, cR);
+                get_hll_flux(cL[tid], cR[tid]);
 
-            get_dust_flux(cL, cR);
+            get_dust_flux(cL[tid], cR[tid]);
 
-            for (size_t s = 0; s < cL.FR.size(); ++s)
-                std::swap(cL.FR[s][idx.vx], cL.FR[s][idx.vz]);
-            for (size_t s = 0; s < cR.FL.size(); ++s)
-                std::swap(cR.FL[s][idx.vx], cR.FL[s][idx.vz]);
+            for (size_t s = 0; s < cL[tid].FR.size(); ++s)
+                std::swap(cL[tid].FR[s][idx.vx], cL[tid].FR[s][idx.vz]);
+            for (size_t s = 0; s < cR[tid].FL.size(); ++s)
+                std::swap(cR[tid].FL[s][idx.vx], cR[tid].FL[s][idx.vz]);
 
-            c[flatL].FR = cL.FR;
-            c[flatR].FL = cR.FL;
+            c[flatL].FR = cL[tid].FR;
+            c[flatR].FL = cR[tid].FL;
         }
     }
 }
@@ -408,7 +431,7 @@ void get_exact_flux(Cell &Left, Cell &Right, double GAMMA){
 
 
 
-double get_pstar(std::vector<double> WL, std::vector<double> WR, double GAMMA){
+double get_pstar(const VarArray& WL, const VarArray& WR, double GAMMA){
     double pPV = 0.5*(WL[2] + WR[2]) - 1./8.*(WR[1] - WL[1])*(WL[0] + WR[0])*(sqrt(GAMMA*WL[2]/WL[0]) + sqrt(GAMMA*WR[2]/WR[0]));
     double pguess = std::max(pPV, 1e-8);
     double p = pguess;       // initialise to pguess, not 0
@@ -424,7 +447,7 @@ double get_pstar(std::vector<double> WL, std::vector<double> WR, double GAMMA){
     return p;
 }
 
-double fK(double p,  std::vector<double> WL,  std::vector<double> WR, int K, double GAMMA){
+double fK(double p,  const VarArray& WL,  const VarArray& WR, int K, double GAMMA){
     double rhoK, pK, aK, AK, BK;
     if(K == 1){
         rhoK = WR[0];
@@ -445,7 +468,7 @@ double fK(double p,  std::vector<double> WL,  std::vector<double> WR, int K, dou
     }
 }
 
-double fprimeK(double p,  std::vector<double> WL,  std::vector<double> WR, int K, double GAMMA){
+double fprimeK(double p,  const VarArray& WL,  const VarArray& WR, int K, double GAMMA){
     double rhoK, pK, aK, AK, BK;
     if(K == 1){
         rhoK = WR[0];

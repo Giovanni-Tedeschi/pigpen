@@ -5,6 +5,6 @@
 
 Params read_param(std::string fname);
 std::vector<Cell> read_ic(Params& p, Grid& g);
-void write_output(std::vector<Cell> c, Params p, Vars& v, const Grid& g);
+void write_output(const std::vector<Cell> &c, Params p, Vars& v, const Grid& g);
 
 #endif // IO_H
