@@ -45,12 +45,16 @@ Params read_param(std::string fname)
     p.dt_snap = stof(configData["dt_snap"]);
     p.BC = stoi(configData["BoundaryCondition"]);
     p.DragIntegrator = stoi(configData["DragIntegrator"]);
+    p.PTC = configData.count("PTC") ? stoi(configData["PTC"]) : 0;
     p.N_dust = stoi(configData["DustSpecies"]);
     p.N_dims = configData.count("N_dims") ? stoi(configData["N_dims"]) : 1;
     p.N_ghost = configData.count("N_ghost") ? stoi(configData["N_ghost"]) : 2;
     p.ghost_in_input = configData.count("ghost_in_input") ? stoi(configData["ghost_in_input"]) : 0;
     p.N_var_gas = 2 + p.N_dims;
     p.N_var_dust = 1 + p.N_dims;
+    if(p.PTC == 1){
+        p.N_var_dust += int(0.5 * p.N_dims * (p.N_dims + 1)); 
+    }
     p.N_vars = p.N_var_gas + p.N_dust * p.N_var_dust;
     p.K.resize(p.N_dust);
     for(int j = 1; j<=p.N_dust; j++){
@@ -86,6 +90,18 @@ Params read_param(std::string fname)
     if (p.N_dims >= 2) idx.vy = 2;
     if (p.N_dims == 3) idx.vz = 3;
     idx.P   = 1 + p.N_dims;
+    if(p.PTC == 1){
+        idx.s11 = 1 + p.N_dims;
+        if (p.N_dims >= 2){
+            idx.s12 = idx.s11 + 1;
+            idx.s22 = idx.s12 + 1;
+        }
+        if (p.N_dims == 3) {
+            idx.s13 = idx.s22 + 1;
+            idx.s23 = idx.s13 + 1;
+            idx.s33 = idx.s23 + 1;
+        }
+    }
 
     return p;
 }
@@ -141,6 +157,7 @@ std::vector<Cell> read_ic(Params &p, Grid& g)
         c[flat].N_dims      = p.N_dims;
         c[flat].N_var_gas   = p.N_var_gas;
         c[flat].N_var_dust  = p.N_var_dust;
+        c[flat].PTC         = p.PTC;
         c[flat].x_center    = p.dx * (0.5 - p.N_ghost + i);
         c[flat].y_center    = p.dy * (0.5 - p.N_ghost + j);
         c[flat].z_center    = p.dz * (0.5 - p.N_ghost + k);

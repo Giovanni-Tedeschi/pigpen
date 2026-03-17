@@ -79,7 +79,11 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
         else
             get_hll_flux(cL[tid], cR[tid]);
 
-        get_dust_flux(cL[tid], cR[tid]);
+        if(p.PTC == 0){
+            get_dust_flux(cL[tid], cR[tid]);
+        }else{
+            get_dust_flux_PTC(cL[tid], cR[tid]);
+        }
 
         // Write fluxes back to original cells
         c[flatL].FR = cL[tid].FR;
@@ -127,7 +131,11 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             else
                 get_hll_flux(cL[tid], cR[tid]);
 
-            get_dust_flux(cL[tid], cR[tid]);
+            if(p.PTC == 0){
+                get_dust_flux(cL[tid], cR[tid]);
+            }else{
+                get_dust_flux_PTC(cL[tid], cR[tid]);
+            }
 
             // Swap fluxes back before storing
             for (size_t s = 0; s < cL[tid].FR.size(); ++s)
@@ -179,7 +187,11 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             else
                 get_hll_flux(cL[tid], cR[tid]);
 
-            get_dust_flux(cL[tid], cR[tid]);
+            if(p.PTC == 0){
+                get_dust_flux(cL[tid], cR[tid]);
+            }else{
+                get_dust_flux_PTC(cL[tid], cR[tid]);
+            }
 
             for (size_t s = 0; s < cL[tid].FR.size(); ++s)
                 std::swap(cL[tid].FR[s][idx.vx], cL[tid].FR[s][idx.vz]);
@@ -228,6 +240,25 @@ void get_dust_flux(Cell &Left, Cell &Right)
 
         for (int l = 0; l < Left.N_var_dust; l++)
             Right.FL[j][l] = Left.FR[j][l];
+    }
+}
+
+
+void get_dust_flux_PTC(Cell &Left, Cell &Right)
+{
+    for(int j=1; j<Left.W.size(); j++){
+        Left.get_dust_F();
+        Right.get_dust_F();
+        double lmin_left  = Left.W[j][idx.vx]  - sqrt(3.*Left.W[j][idx.s11]);
+        double lmax_right = Right.W[j][idx.vx] + sqrt(3.*Right.W[j][idx.s11]);
+        double inv_denom = 1./(lmin_left - lmax_right);
+        for(int l=0; l<=Left.N_var_dust; l++){
+            double int_state = (lmin_left * Left.U[j][l] - lmax_right * Right.U[j][l]) * inv_denom;
+            int_state -= (Left.F[j][l] - Right.F[j][l]) * inv_denom;
+        
+            Left.FR[j][l] = 0.5 * (Left.F[j][l] + Right.F[j][l]) - 0.5 * fabs(lmin_left) * (int_state - Left.U[j][l]) - 0.5*fabs(lmax_right) * (Right.U[j][l] - int_state);
+            Right.FL[j][l] = Left.FR[j][l];
+        }
     }
 }
 

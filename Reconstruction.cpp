@@ -37,7 +37,7 @@ void compute_slopes(std::vector<Cell> &c, Params p, const Grid& g)
         {
             double dR = c[flatR].U[s][var] - c[flat].U[s][var];
             double dL = c[flat].U[s][var]  - c[flatL].U[s][var];
-            c[flat].dU[s][var] = 0.5 * MC(dL, dR);   // swap to van_leer or minmod as needed
+            c[flat].dU[s][var] = 0.5 * van_leer(dL, dR);   // swap to van_leer or minmod as needed
         }
     }
     // Y-slopes (only if N_dims >= 2)
@@ -57,7 +57,7 @@ void compute_slopes(std::vector<Cell> &c, Params p, const Grid& g)
             {
                 double dR = c[flatR].U[s][var] - c[flat].U[s][var];
                 double dL = c[flat].U[s][var]  - c[flatL].U[s][var];
-                c[flat].dUy[s][var] = 0.5 * MC(dL, dR);   // swap to van_leer or minmod as needed
+                c[flat].dUy[s][var] = 0.5 * van_leer(dL, dR);   // swap to van_leer or minmod as needed
             }
         }
     }
@@ -79,7 +79,7 @@ void compute_slopes(std::vector<Cell> &c, Params p, const Grid& g)
             {
                 double dR = c[flatR].U[s][var] - c[flat].U[s][var];
                 double dL = c[flat].U[s][var]  - c[flatL].U[s][var];
-                c[flat].dUz[s][var] = 0.5 * MC(dL, dR);   // swap to van_leer or minmod as needed
+                c[flat].dUz[s][var] = 0.5 * van_leer(dL, dR);   // swap to van_leer or minmod as needed
             }
         }
     }
