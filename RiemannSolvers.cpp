@@ -107,9 +107,16 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
 
             // Slopes were computed in original orientation -- swap dU too
             for (size_t s = 0; s < cL[tid].dU.size(); ++s)
+            for (size_t var = 0; var < cL[tid].dU[s].size(); ++var)
+            {
+                cL[tid].dU[s][var] = c[flatL].dUy[s][var];
+                cR[tid].dU[s][var] = c[flatR].dUy[s][var];
+            }
+            for (size_t s = 0; s < cL[tid].dU.size(); ++s)
+            {
                 std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vy]);
-            for (size_t s = 0; s < cR[tid].dU.size(); ++s)
                 std::swap(cR[tid].dU[s][idx.vx], cR[tid].dU[s][idx.vy]);
+            }
 
             if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
 
@@ -128,8 +135,8 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             for (size_t s = 0; s < cR[tid].FL.size(); ++s)
                 std::swap(cR[tid].FL[s][idx.vx], cR[tid].FL[s][idx.vy]);
 
-            c[flatL].FR = cL[tid].FR;
-            c[flatR].FL = cR[tid].FL;
+            c[flatL].FRy = cL[tid].FR;
+            c[flatR].FLy = cR[tid].FL;
         }
     }
 
@@ -152,9 +159,16 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             swap_xz(cR[tid]);
 
             for (size_t s = 0; s < cL[tid].dU.size(); ++s)
+            for (size_t var = 0; var < cL[tid].dU[s].size(); ++var)
+            {
+                cL[tid].dU[s][var] = c[flatL].dUz[s][var];
+                cR[tid].dU[s][var] = c[flatR].dUz[s][var];
+            }
+            for (size_t s = 0; s < cL[tid].dU.size(); ++s)
+            {
                 std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vz]);
-            for (size_t s = 0; s < cR[tid].dU.size(); ++s)
                 std::swap(cR[tid].dU[s][idx.vx], cR[tid].dU[s][idx.vz]);
+            }
 
             if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
 
@@ -172,8 +186,8 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             for (size_t s = 0; s < cR[tid].FL.size(); ++s)
                 std::swap(cR[tid].FL[s][idx.vx], cR[tid].FL[s][idx.vz]);
 
-            c[flatL].FR = cL[tid].FR;
-            c[flatR].FL = cR[tid].FL;
+            c[flatL].FRz = cL[tid].FR;
+            c[flatR].FLz = cR[tid].FL;
         }
     }
 }

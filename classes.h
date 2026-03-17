@@ -139,23 +139,9 @@ struct SpeciesArray {
 
 class Cell{
     public:
-        SpeciesArray W, U, Uold, dU, dW, F, FL, FR, K1, K2, K, Ln, Un;
+        SpeciesArray W, U, Uold, dU, dUy, dUz, dW, F, FL, FR, FLy, FRy, FLz, FRz, K1, K2, K, Ln, Un;
         VarArray alpha;
-        
-        /*std::vector<std::vector<double>> W;
-        std::vector<std::vector<double>> U;
-        std::vector<std::vector<double>> Uold;
-        std::vector<std::vector<double>> dU;
-        std::vector<std::vector<double>> dW;
-        std::vector<std::vector<double>> F;
-        std::vector<std::vector<double>> FL;
-        std::vector<std::vector<double>> FR;
-        std::vector<std::vector<double>> K1;
-        std::vector<std::vector<double>> K2;
-        std::vector<std::vector<double>> K;
-        std::vector<std::vector<double>> Ln;
-        std::vector<std::vector<double>> Un;
-        std::vector<double> alpha;*/
+
         double GAMMA;
         double sound_speed;
         int N_dust;
@@ -166,16 +152,6 @@ class Cell{
         double y_center;
         double z_center;
 
-        /*Cell& operator=(const Cell& other) {
-            if (this != &other) {  // Prevent self-assignment
-                // Copy all member variables
-                W = other.W;
-                U = other.U;
-                F = other.F;
-            }
-            return *this;
-        }*/
-
         void initialize() {
             alpha.resize(N_dust);
 
@@ -184,9 +160,15 @@ class Cell{
             Uold.resize(N_dust+1);
             dW.resize(N_dust+1);
             dU.resize(N_dust+1);
+            dUy.resize(N_dust+1);
+            dUz.resize(N_dust+1);
             F.resize(N_dust+1);
             FL.resize(N_dust+1);
             FR.resize(N_dust+1);
+            FLy.resize(N_dust+1);
+            FRy.resize(N_dust+1);
+            FLz.resize(N_dust+1);
+            FRz.resize(N_dust+1);
             K1.resize(N_dust+1);
             K2.resize(N_dust+1);
             K.resize(N_dust+1);
@@ -198,9 +180,15 @@ class Cell{
             Uold[0].resize(N_var_gas);
             dW[0].resize(N_var_gas);
             dU[0].resize(N_var_gas);
+            dUy[0].resize(N_var_gas);
+            dUz[0].resize(N_var_gas);
             F[0].resize(N_var_gas);
             FL[0].resize(N_var_gas);
             FR[0].resize(N_var_gas);
+            FLy[0].resize(N_var_gas);
+            FRy[0].resize(N_var_gas);
+            FLz[0].resize(N_var_gas);
+            FRz[0].resize(N_var_gas);
             K1[0].resize(N_var_gas);
             K2[0].resize(N_var_gas);
             K[0].resize(N_var_gas);
@@ -213,9 +201,15 @@ class Cell{
                 Uold[j].resize(N_var_dust);  
                 dW[j].resize(N_var_dust);
                 dU[j].resize(N_var_dust);   
+                dUy[j].resize(N_var_dust);
+                dUz[j].resize(N_var_dust);
                 F[j].resize(N_var_dust);
                 FL[j].resize(N_var_dust);
                 FR[j].resize(N_var_dust);
+                FLy[j].resize(N_var_dust);
+                FRy[j].resize(N_var_dust);
+                FLz[j].resize(N_var_dust);
+                FRz[j].resize(N_var_dust);
                 K1[j].resize(N_var_dust);
                 K2[j].resize(N_var_dust);
                 K[j].resize(N_var_dust);
