@@ -65,6 +65,25 @@ void swap_xz_flux(Cell &c)
     }
 }
 
+void ensure_positivity(Cell &Left, Cell &Right, Params p){
+    double rho_min = 1e-8;
+    for (size_t s = 0; s < Left.W.size(); ++s)
+    {
+        if (Left.W[s][idx.rho]  < rho_min) Left.W[s][idx.rho]  = rho_min;
+        if (Right.W[s][idx.rho] < rho_min) Right.W[s][idx.rho] = rho_min;
+        if(s > 0 && p.PTC == 1){
+            if(Left.W[s][idx.s11] < 0.) Left.W[s][idx.s11] = 1e-8;
+            if(Right.W[s][idx.s11] < 0.) Right.W[s][idx.s11] = 1e-8;
+            if(p.N_dims >= 2){
+                if(Left.W[s][idx.s22] < 0.) Left.W[s][idx.s22] = 1e-8;
+                if(Right.W[s][idx.s22] < 0.) Right.W[s][idx.s22] = 1e-8;
+            }
+        }
+        Left.get_U_from_W();
+        Right.get_U_from_W();
+    }
+}
+
 void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
 {
     if (p.apply_reconstruction == 1) compute_slopes(c, p, g);
@@ -95,6 +114,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
         cR[tid] = c[flatR];
 
         if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
+        ensure_positivity(cL[tid], cR[tid], p);
 
         if (p.RiemannSolver == 0)
             get_exact_flux(cL[tid], cR[tid], p.GAMMA);
@@ -106,7 +126,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
         if(p.PTC == 0){
             get_dust_flux(cL[tid], cR[tid]);
         }else{
-            get_dust_flux_PTC(cL[tid], cR[tid]);
+            get_dust_flux(cL[tid], cR[tid]);
         }
 
         // Write fluxes back to original cells
@@ -151,6 +171,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             }
 
             if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
+            ensure_positivity(cL[tid], cR[tid], p);
 
             if (p.RiemannSolver == 0)
                 get_exact_flux(cL[tid], cR[tid], p.GAMMA);
@@ -162,7 +183,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             if(p.PTC == 0){
                 get_dust_flux(cL[tid], cR[tid]);
             }else{
-                get_dust_flux_PTC(cL[tid], cR[tid]);
+                get_dust_flux(cL[tid], cR[tid]);
             }
 
             // Swap fluxes back before storing
@@ -211,6 +232,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             }
 
             if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
+            ensure_positivity(cL[tid], cR[tid], p);
 
             if (p.RiemannSolver == 0)
                 get_exact_flux(cL[tid], cR[tid], p.GAMMA);
@@ -222,7 +244,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             if(p.PTC == 0){
                 get_dust_flux(cL[tid], cR[tid]);
             }else{
-                get_dust_flux_PTC(cL[tid], cR[tid]);
+                get_dust_flux(cL[tid], cR[tid]);
             }
 
             swap_xz_flux(cL[tid]);
