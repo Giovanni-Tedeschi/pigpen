@@ -237,35 +237,33 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
 
 void get_dust_flux(Cell &Left, Cell &Right)
 {
-    for(int j=1; j<Left.W.size(); j++){
+    Left.get_dust_F();
+    Right.get_dust_F();
 
+    for(int j=1; j<Left.W.size(); j++){
         if ((Left.W[j][idx.vx] > 0.) && (Right.W[j][idx.vx] > 0.))
         {
-            Left.FR[j][idx.rho] = Left.W[j][idx.rho] * Left.W[j][idx.vx];
-            Left.FR[j][idx.vx] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vx];
-            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vy];
-            if (Left.N_dims == 3) Left.FR[j][idx.vz] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vz];
+            for(int l=0; l<Left.N_var_dust; l++){
+                Left.FR[j][l] = Left.F[j][l];
+            }
         }
         else if ((Left.W[j][idx.vx] < 0.) && (Right.W[j][idx.vx] < 0.))
         {
-            Left.FR[j][idx.rho] = Right.W[j][idx.rho] * Right.W[j][idx.vx];
-            Left.FR[j][idx.vx] = Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vx];
-            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vy];
-            if (Left.N_dims == 3) Left.FR[j][idx.vz] = Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vz];
+            for(int l=0; l<Left.N_var_dust; l++){
+                Left.FR[j][l] = Right.F[j][l];
+            }
         }
         else if ((Left.W[j][idx.vx] <= 0.) && (Right.W[j][idx.vx] >= 0.))
         {
-            Left.FR[j][idx.rho] = 0.;
-            Left.FR[j][idx.vx] = 0.;
-            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = 0.;
-            if (Left.N_dims == 3) Left.FR[j][idx.vz] = 0.;
+            for(int l=0; l<Left.N_var_dust; l++){
+                Left.FR[j][l] = 0.0;
+            }
         }
         else if ((Left.W[j][idx.vx] > 0.) && (Right.W[j][idx.vx] < 0.))
         {
-            Left.FR[j][idx.rho] = Left.W[j][idx.rho] * Left.W[j][idx.vx] + Right.W[j][idx.rho] * Right.W[j][idx.vx];
-            Left.FR[j][idx.vx] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vx] + Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vx];
-            if (Left.N_dims >= 2) Left.FR[j][idx.vy] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vy] + Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vy];
-            if (Left.N_dims == 3) Left.FR[j][idx.vz] = Left.W[j][idx.rho] * Left.W[j][idx.vx] * Left.W[j][idx.vz] + Right.W[j][idx.rho] * Right.W[j][idx.vx] * Right.W[j][idx.vz];
+            for(int l=0; l<Left.N_var_dust; l++){
+                Left.FR[j][l] = Left.F[j][l] + Right.F[j][l];
+            }
         }
 
         for (int l = 0; l < Left.N_var_dust; l++)
