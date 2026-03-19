@@ -9,18 +9,32 @@
 
 void swap_xy(Cell &c)
 {
-    for (size_t s = 0; s < c.W.size(); s++)
+    for (size_t s = 0; s < c.W.size(); s++){
         std::swap(c.W[s][idx.vx], c.W[s][idx.vy]);
-    for (size_t s = 0; s < c.U.size(); s++)
+        if(c.PTC==1 && s > 0) std::swap(c.W[s][idx.s11], c.W[s][idx.s22]);
+    }
+    for (size_t s = 0; s < c.U.size(); s++){
         std::swap(c.U[s][idx.vx], c.U[s][idx.vy]);
+        if(c.PTC==1 && s > 0) std::swap(c.U[s][idx.s11], c.U[s][idx.s22]);
+    }
 }
 
 void swap_xz(Cell &c)
 {
-    for (size_t s = 0; s < c.W.size(); s++)
+    for (size_t s = 0; s < c.W.size(); s++){
         std::swap(c.W[s][idx.vx], c.W[s][idx.vz]);
-    for (size_t s = 0; s < c.U.size(); s++)
+        if(c.PTC==1 && s > 0){
+            std::swap(c.W[s][idx.s11], c.W[s][idx.s33]);
+            std::swap(c.W[s][idx.s12], c.W[s][idx.s23]);
+        }
+    }
+    for (size_t s = 0; s < c.U.size(); s++){
         std::swap(c.U[s][idx.vx], c.U[s][idx.vz]);
+        if(c.PTC==1 && s > 0){
+            std::swap(c.U[s][idx.s11], c.U[s][idx.s33]);
+            std::swap(c.U[s][idx.s12], c.U[s][idx.s23]);
+        }
+    }
 }
 
 void swap_xy_flux(Cell &c)
@@ -28,7 +42,9 @@ void swap_xy_flux(Cell &c)
     for (size_t s = 0; s < c.FL.size(); s++)
     {
         std::swap(c.FL[s][idx.vx], c.FL[s][idx.vy]);
+        if(c.PTC==1 && s > 0) std::swap(c.FL[s][idx.s11], c.FL[s][idx.s22]);
         std::swap(c.FR[s][idx.vx], c.FR[s][idx.vy]);
+        if(c.PTC==1 && s > 0) std::swap(c.FR[s][idx.s11], c.FR[s][idx.s22]);
     }
 }
 
@@ -37,7 +53,15 @@ void swap_xz_flux(Cell &c)
     for (size_t s = 0; s < c.FL.size(); s++)
     {
         std::swap(c.FL[s][idx.vx], c.FL[s][idx.vz]);
+        if(c.PTC==1 && s > 0){
+            std::swap(c.FL[s][idx.s11], c.FL[s][idx.s33]);
+            std::swap(c.FL[s][idx.s12], c.FL[s][idx.s23]);
+        }
         std::swap(c.FR[s][idx.vx], c.FR[s][idx.vz]);
+        if(c.PTC==1 && s > 0){
+            std::swap(c.FR[s][idx.s11], c.FR[s][idx.s33]);
+            std::swap(c.FR[s][idx.s12], c.FR[s][idx.s23]);
+        }
     }
 }
 
@@ -120,6 +144,10 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             {
                 std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vy]);
                 std::swap(cR[tid].dU[s][idx.vx], cR[tid].dU[s][idx.vy]);
+                if(cL[tid].PTC==1 && s > 0){
+                    std::swap(cL[tid].dU[s][idx.s11], cL[tid].dU[s][idx.s22]);
+                    std::swap(cR[tid].dU[s][idx.s11], cR[tid].dU[s][idx.s22]);
+                }
             }
 
             if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
@@ -138,10 +166,8 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             }
 
             // Swap fluxes back before storing
-            for (size_t s = 0; s < cL[tid].FR.size(); ++s)
-                std::swap(cL[tid].FR[s][idx.vx], cL[tid].FR[s][idx.vy]);
-            for (size_t s = 0; s < cR[tid].FL.size(); ++s)
-                std::swap(cR[tid].FL[s][idx.vx], cR[tid].FL[s][idx.vy]);
+            swap_xy_flux(cL[tid]);
+            swap_xy_flux(cR[tid]);
 
             c[flatL].FRy = cL[tid].FR;
             c[flatR].FLy = cR[tid].FL;
@@ -176,6 +202,12 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             {
                 std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vz]);
                 std::swap(cR[tid].dU[s][idx.vx], cR[tid].dU[s][idx.vz]);
+                if(cL[tid].PTC==1 && s > 0){
+                    std::swap(cL[tid].dU[s][idx.s11], cL[tid].dU[s][idx.s33]);
+                    std::swap(cL[tid].dU[s][idx.s12], cL[tid].dU[s][idx.s23]);
+                    std::swap(cR[tid].dU[s][idx.s11], cR[tid].dU[s][idx.s33]);
+                    std::swap(cR[tid].dU[s][idx.s12], cR[tid].dU[s][idx.s23]);
+                }
             }
 
             if (p.apply_reconstruction == 1) reconstruct_cell_pair(cL[tid], cR[tid], 1);
@@ -193,10 +225,8 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
                 get_dust_flux_PTC(cL[tid], cR[tid]);
             }
 
-            for (size_t s = 0; s < cL[tid].FR.size(); ++s)
-                std::swap(cL[tid].FR[s][idx.vx], cL[tid].FR[s][idx.vz]);
-            for (size_t s = 0; s < cR[tid].FL.size(); ++s)
-                std::swap(cR[tid].FL[s][idx.vx], cR[tid].FL[s][idx.vz]);
+            swap_xz_flux(cL[tid]);
+            swap_xz_flux(cR[tid]);
 
             c[flatL].FRz = cL[tid].FR;
             c[flatR].FLz = cR[tid].FL;
@@ -293,6 +323,7 @@ void get_hll_flux(Cell &Left, Cell &Right)
     for (int j = 0; j < Left.N_var_gas; j++)
         Right.FL[0][j] = Left.FR[0][j];
 }
+
 
 void get_hllc_flux(Cell &Left, Cell &Right, double GAMMA){
     double rhoL = Left.W[0][idx.rho],  rhoR = Right.W[0][idx.rho];
