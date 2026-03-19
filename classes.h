@@ -21,7 +21,16 @@ class Params{
         double dy;
         double dz;
         double const_dt;
-        double BC;
+        double BC; // Global BC type (0: periodic, 1: outflow, 2: reflecting)
+
+        // Per-face BCs (-1 => fallback to BC)
+        int BC_xmin = -1;
+        int BC_xmax = -1;
+        int BC_ymin = -1;
+        int BC_ymax = -1;
+        int BC_zmin = -1;
+        int BC_zmax = -1;
+
         int ghost_in_input;
         int RiemannSolver;
         int N_cells;
@@ -140,7 +149,7 @@ struct SpeciesArray {
 
 class Cell{
     public:
-        SpeciesArray W, U, Uold, dU, dUy, dUz, dW, F, FL, FR, FLy, FRy, FLz, FRz, K1, K2, K, Ln, Un;
+        SpeciesArray W, U, Uold, dU, dUy, dUz, dW, dWy, dWz, F, FL, FR, FLy, FRy, FLz, FRz, K1, K2, K, Ln, Un;
         VarArray alpha;
 
         double GAMMA;

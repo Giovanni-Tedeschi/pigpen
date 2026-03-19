@@ -10,6 +10,43 @@
 
 Indices idx; // Define global variable
 
+namespace {
+int parse_bc_code(const std::string& raw, int fallback)
+{
+    if (raw.empty()) return fallback;
+
+    std::string s = raw;
+    std::transform(s.begin(), s.end(), s.begin(),
+                   [](unsigned char c){ return static_cast<char>(std::tolower(c)); });
+
+    if (s == "0" || s == "transmissive" || s == "trasmissive" || s == "outflow" || s == "open") return 0;
+    if (s == "1" || s == "periodic") return 1;
+    if (s == "2" || s == "reflective" || s == "reflecting" || s == "box" || s == "box-like") return 2;
+
+    try {
+        int v = std::stoi(s);
+        return (v >= 0 && v <= 2) ? v : fallback;
+    } catch (...) {
+        return fallback;
+    }
+}
+
+int read_face_bc(const std::unordered_map<std::string, std::string>& cfg,
+                 const std::string& k1,
+                 const std::string& k2 = "")
+{
+    auto it = cfg.find(k1);
+    if (it != cfg.end()) return parse_bc_code(it->second, -1);
+
+    if (!k2.empty()) {
+        it = cfg.find(k2);
+        if (it != cfg.end()) return parse_bc_code(it->second, -1);
+    }
+
+    return -1; // fallback to global BC
+}
+} // namespace
+
 Params read_param(std::string fname)
 {
     Params p;
@@ -43,7 +80,8 @@ Params read_param(std::string fname)
     p.GAMMA = stof(configData["GAMMA"]);
     p.t_max = stof(configData["t_max"]);
     p.dt_snap = stof(configData["dt_snap"]);
-    p.BC = stoi(configData["BoundaryCondition"]);
+    p.BC = parse_bc_code(configData["BoundaryCondition"], 0);
+
     p.DragIntegrator = stoi(configData["DragIntegrator"]);
     p.PTC = configData.count("PTC") ? stoi(configData["PTC"]) : 0;
     p.N_dust = stoi(configData["DustSpecies"]);
@@ -84,6 +122,18 @@ Params read_param(std::string fname)
     p.g0 = configData.count("g0") ? stof(configData["g0"]) : 0.0;
     p.Omega0 = configData.count("Omega0") ? stof(configData["Omega0"]) : 0.0;
     p.q = configData.count("q") ? stof(configData["q"]) : 0.0;
+
+    // Optional per-face BC overrides
+    p.BC_xmin = read_face_bc(configData, "BC_xmin", "BoundaryCondition_xmin");
+    p.BC_xmax = read_face_bc(configData, "BC_xmax", "BoundaryCondition_xmax");
+    if(p.N_dims >= 2){
+        p.BC_ymin = read_face_bc(configData, "BC_ymin", "BoundaryCondition_ymin");
+        p.BC_ymax = read_face_bc(configData, "BC_ymax", "BoundaryCondition_ymax");
+    }
+    if(p.N_dims == 3){
+        p.BC_zmin = read_face_bc(configData, "BC_zmin", "BoundaryCondition_zmin");
+        p.BC_zmax = read_face_bc(configData, "BC_zmax", "BoundaryCondition_zmax");
+    }
 
     idx.rho = 0;
     idx.vx  = 1;
