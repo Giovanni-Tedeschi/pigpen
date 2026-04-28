@@ -21,7 +21,7 @@ class Params{
         double dy;
         double dz;
         double const_dt;
-        double BC; // Global BC type (0: periodic, 1: outflow, 2: reflecting)
+        double BC; // Global BC type (0: outflow, 1: periodic, 2: reflecting)
 
         // Per-face BCs (-1 => fallback to BC)
         int BC_xmin = -1;
@@ -282,9 +282,9 @@ class Cell{
 
         void get_W_from_U(){
             // GAS
-            double v2 = W[0][idx.vx]*W[0][idx.vx];
             W[0][idx.rho] = U[0][idx.rho];                    
             W[0][idx.vx] = U[0][idx.vx] / U[0][idx.rho];     
+            double v2 = W[0][idx.vx]*W[0][idx.vx];
             // DUST
             for(int j=1; j<=N_dust; j++){
                 W[j][idx.rho] = U[j][idx.rho];
@@ -401,6 +401,20 @@ class Cell{
                 if (N_dims >= 2) v2 += W[j][idx.vy] * W[j][idx.vy];
                 if (N_dims == 3) v2 += W[j][idx.vz] * W[j][idx.vz];
                 vsig += sqrt(v2);
+
+                double vsig_PTC2 = 0.0;
+                if(PTC == 1){
+                    vsig_PTC2 += W[j][idx.s11];
+                    if(N_dims >= 2){
+                        vsig_PTC2 += W[j][idx.s22];
+                    }
+                    if(N_dims == 3){
+                        vsig_PTC2 += W[j][idx.s33];
+                    }
+                    vsig_PTC2 *= 144 * 3;
+                    if(vsig_PTC2 < 0.) vsig_PTC2 = 0.;
+                    vsig += sqrt(vsig_PTC2);
+                }
             }
             return vsig;
         }

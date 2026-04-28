@@ -69,19 +69,41 @@ void ensure_positivity(Cell &Left, Cell &Right, Params p){
     double rho_min = 1e-8;
     for (size_t s = 0; s < Left.W.size(); ++s)
     {
-        if (Left.W[s][idx.rho]  < rho_min) Left.W[s][idx.rho]  = rho_min;
-        if (Right.W[s][idx.rho] < rho_min) Right.W[s][idx.rho] = rho_min;
-        if(s > 0 && p.PTC == 1){
-            if(Left.W[s][idx.s11] < 0.) Left.W[s][idx.s11] = 1e-8;
-            if(Right.W[s][idx.s11] < 0.) Right.W[s][idx.s11] = 1e-8;
-            if(p.N_dims >= 2){
-                if(Left.W[s][idx.s22] < 0.) Left.W[s][idx.s22] = 1e-8;
-                if(Right.W[s][idx.s22] < 0.) Right.W[s][idx.s22] = 1e-8;
+        // Clamp density in W and U consistently
+        if (Left.W[s][idx.rho] < rho_min){
+            Left.W[s][idx.rho] = rho_min;
+            Left.U[s][idx.rho] = rho_min;   // U[rho] = rho directly
+        }
+        if (Right.W[s][idx.rho] < rho_min){
+            Right.W[s][idx.rho] = rho_min;
+            Right.U[s][idx.rho] = rho_min;
+        }
+
+        if (s > 0 && p.PTC == 1)
+        {
+            // Clamp diagonal stress in W; recompute corresponding U component
+            // U[s11] = rho * s11, so clamp W then fix U
+            if (Left.W[s][idx.s11] < 1e-8){
+                Left.W[s][idx.s11] = 1e-8;
+                Left.U[s][idx.s11] = Left.W[s][idx.rho] * 1e-8;
+            }
+            if (Right.W[s][idx.s11] < 1e-8){
+                Right.W[s][idx.s11] = 1e-8;
+                Right.U[s][idx.s11] = Right.W[s][idx.rho] * 1e-8;
+            }
+            if (p.N_dims >= 2){
+                if (Left.W[s][idx.s22] < 1e-8){
+                    Left.W[s][idx.s22] = 1e-8;
+                    Left.U[s][idx.s22] = Left.W[s][idx.rho] * 1e-8;
+                }
+                if (Right.W[s][idx.s22] < 1e-8){
+                    Right.W[s][idx.s22] = 1e-8;
+                    Right.U[s][idx.s22] = Right.W[s][idx.rho] * 1e-8;
+                }
             }
         }
-        Left.get_U_from_W();
-        Right.get_U_from_W();
     }
+    // Do NOT call get_U_from_W() here — it would overwrite the reconstructed U
 }
 
 void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
@@ -126,12 +148,13 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
         if(p.PTC == 0){
             get_dust_flux(cL[tid], cR[tid]);
         }else{
-            get_dust_flux(cL[tid], cR[tid]);
+            get_dust_flux_PTC(cL[tid], cR[tid]);
         }
 
         // Write fluxes back to original cells
         c[flatL].FR = cL[tid].FR;
         c[flatR].FL = cR[tid].FL;
+
     }
 
     // ---- Y-sweep (only if N_dims >= 2) ----
@@ -160,6 +183,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
                 cL[tid].dU[s][var] = c[flatL].dUy[s][var];
                 cR[tid].dU[s][var] = c[flatR].dUy[s][var];
             }
+
             for (size_t s = 0; s < cL[tid].dU.size(); ++s)
             {
                 std::swap(cL[tid].dU[s][idx.vx], cL[tid].dU[s][idx.vy]);
@@ -183,7 +207,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             if(p.PTC == 0){
                 get_dust_flux(cL[tid], cR[tid]);
             }else{
-                get_dust_flux(cL[tid], cR[tid]);
+                get_dust_flux_PTC(cL[tid], cR[tid]);
             }
 
             // Swap fluxes back before storing
@@ -244,7 +268,7 @@ void compute_fluxes(std::vector<Cell> &c, Params p, const Grid& g)
             if(p.PTC == 0){
                 get_dust_flux(cL[tid], cR[tid]);
             }else{
-                get_dust_flux(cL[tid], cR[tid]);
+                get_dust_flux_PTC(cL[tid], cR[tid]);
             }
 
             swap_xz_flux(cL[tid]);
@@ -296,16 +320,23 @@ void get_dust_flux(Cell &Left, Cell &Right)
 
 void get_dust_flux_PTC(Cell &Left, Cell &Right)
 {
+    Left.get_dust_F();
+    Right.get_dust_F();
+
     for(int j=1; j<Left.W.size(); j++){
-        Left.get_dust_F();
-        Right.get_dust_F();
+        if(Left.W[j][idx.s11] < 1e-8) Left.W[j][idx.s11] = 1e-8;
+        if(Right.W[j][idx.s11] < 1e-8) Right.W[j][idx.s11] = 1e-8;
         double lmin_left  = Left.W[j][idx.vx]  - sqrt(3.*Left.W[j][idx.s11]);
         double lmax_right = Right.W[j][idx.vx] + sqrt(3.*Right.W[j][idx.s11]);
         double inv_denom = 1./(lmin_left - lmax_right);
-        for(int l=0; l<=Left.N_var_dust; l++){
-            double int_state = (lmin_left * Left.U[j][l] - lmax_right * Right.U[j][l]) * inv_denom;
-            int_state -= (Left.F[j][l] - Right.F[j][l]) * inv_denom;
-        
+        double int_state = 0.0;
+        for(int l=0; l<Left.N_var_dust; l++){
+            if(fabs(lmin_left - lmax_right) > 1e-8){
+                int_state = (lmin_left * Left.U[j][l] - lmax_right * Right.U[j][l]) * inv_denom;
+                int_state -= (Left.F[j][l] - Right.F[j][l]) * inv_denom;
+            }else{
+                int_state = 0.0;
+            }
             Left.FR[j][l] = 0.5 * (Left.F[j][l] + Right.F[j][l]) - 0.5 * fabs(lmin_left) * (int_state - Left.U[j][l]) - 0.5*fabs(lmax_right) * (Right.U[j][l] - int_state);
             Right.FL[j][l] = Left.FR[j][l];
         }

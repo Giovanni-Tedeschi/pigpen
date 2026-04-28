@@ -182,13 +182,13 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 
         RK_K(c[flat], p, dt, gamma1, gamma2, beta1, beta2);
 
-        c[flat].U[0][idx.vx] += b * dt * c[flat].K1[0][idx.vx] + (1.-b) * dt * c[flat].K2[0][idx.vx];
+        //c[flat].U[0][idx.vx] += b * dt * c[flat].K1[0][idx.vx] + (1.-b) * dt * c[flat].K2[0][idx.vx];
         for (int s = 1; s <= p.N_dust; s++)
             c[flat].U[s][idx.vx] += b * dt * c[flat].K1[s][idx.vx] + (1.-b) * dt * c[flat].K2[s][idx.vx];
 
         if (p.N_dims >= 2)
         {
-            c[flat].U[0][idx.vy] += b * dt * c[flat].K1[0][idx.vy] + (1.-b) * dt * c[flat].K2[0][idx.vy];
+            //c[flat].U[0][idx.vy] += b * dt * c[flat].K1[0][idx.vy] + (1.-b) * dt * c[flat].K2[0][idx.vy];
             for (int s = 1; s <= p.N_dust; s++)
                 c[flat].U[s][idx.vy] += b * dt * c[flat].K1[s][idx.vy] + (1.-b) * dt * c[flat].K2[s][idx.vy];
         }
@@ -201,6 +201,20 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
         }
 
         c[flat].get_W_from_U();
+
+        if(p.PTC == 1){
+            for (int s = 1; s <= p.N_dust; s++){
+                double ts_i = c[flat].U[s][idx.rho] / p.K[s-1];
+                if(ts_i > 1e-8){
+                    c[flat].W[s][idx.s11] *= std::exp(- 2.*dt / ts_i);
+                    if(p.N_dims >= 2){
+                        c[flat].W[s][idx.s12] *= std::exp(- 2.*dt / ts_i);
+                        c[flat].W[s][idx.s22] *= std::exp(- 2.*dt / ts_i);
+                    }
+                }
+            }
+        }
+        c[flat].get_U_from_W();
     }
 }
 

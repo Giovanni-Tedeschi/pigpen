@@ -245,6 +245,29 @@ def write_shock_B(N, folder):
         fields += [lr(1, 16), lr(2.0, 0.125)]
     write_ic(f"{folder}/DUSTYSHOCK/shock_B.inp", fields)
 
+# ============================================================
+# SHOCK Particle Crossing Trajectory (PTC)
+# ============================================================
+
+def write_shock_PTC(N, folder):
+    NL = int(N * 0.5)
+    NR = N - NL
+    def lr(vL, vR): return np.concatenate([np.ones(NL)*vL, np.ones(NR)*vR])
+    gasrho = lr(1, 1);  gasvelx = lr(0.0, 0.0); gasvely = lr(0.0, 0.0);  P = lr(1, 1)
+    #dustrho = lr(1, 0.125); dustvelx = lr(0.0, 0.0); dustvely = lr(0.0, 0.0); dusts11 = lr(2.0, 0.2/0.125); dusts12 = lr(0.05, 0.1/0.125); dusts22 = lr(0.6, 0.2/0.125)
+    dustrho = lr(1, 0.125); dustvelx = lr(0.0, 0.0); dustvely = lr(0.0, 0.0); dusts11 = lr(0.6, 0.2/0.125); dusts12 = lr(0.05, 0.1/0.125); dusts22 = lr(2.0, 0.2/0.125)
+    fields = [gasrho, gasvelx, gasvely, P, dustrho, dustvelx, dustvely, dusts11, dusts12, dusts22]
+    write_ic(f"{folder}/PTC_SHOCK/shock_PTC.inp", fields)
+
+
+def write_shock_PTC_vacuum(N, folder):
+    NL = int(N * 0.5)
+    NR = N - NL
+    def lr(vL, vR): return np.concatenate([np.ones(NL)*vL, np.ones(NR)*vR])
+    gasrho = lr(1, 1);  gasvelx = lr(0.0, 0.0); gasvely = lr(0.0, 0.0);  P = lr(1, 1)
+    dustrho = lr(1, 0.0); dustvelx = lr(0.0, 0.0); dustvely = lr(0.0, 0.0); dusts11 = lr(2.0, 0.0); dusts12 = lr(0.05, 0.0); dusts22 = lr(0.6, 0.0)
+    fields = [gasrho, gasvelx, gasvely, P, dustrho, dustvelx, dustvely, dusts11, dusts12, dusts22]
+    write_ic(f"{folder}/PTC_SHOCK/shock_PTC_vacuum.inp", fields)
 
 # ============================================================
 # STEADY_STATE_DRIFT  (2D, includes ghosts)
@@ -331,3 +354,52 @@ def write_kelvin_helmholtz(N, folder, dims=2, dust_to_gas=0.01):
     if dims == 3: fields += [ones * 0]
 
     write_ic(f"{folder}/DUSTYKH/kh_{dims}D.inp", fields)
+
+
+
+def write_kelvin_helmholtz_PTC(N, folder, dims=2, dust_to_gas=0.01):
+    """
+    Kelvin-Helmholtz instability IC matching the SPH setup:
+    - Smooth tanh density and velocity profiles at y=0.25 and y=0.75
+    - Two sinusoidal modes (sin(4*pi*x)) for vy perturbation
+    - Dust comoving with gas, dust-to-gas ratio = dust_to_gas
+    dims must be >= 2.
+    """
+    assert dims >= 2, "KH instability requires at least 2D"
+
+    x, y, z = make_grid(N, dims)
+    ones = np.ones_like(x)
+    zeros = np.zeros_like(x)
+
+    rho1, rho2 = 1.0, 2.0
+    Dy   = 0.025          # shear layer width (matches SPH Dy)
+    Drho = 0.5*(rho2-rho1)
+    vx1, vx2 = -0.5, 0.5
+    A0 = 0.01             # vy perturbation amplitude
+    P  = 2.5              # uniform pressure
+
+    # Smooth density profile (matches rho_KH in SPH code)
+    gasrho = (rho1
+              + Drho * (np.tanh((y - 0.25) / Dy) - np.tanh((y - 0.75) / Dy) - 1.0))
+
+    # Smooth velocity profile (matches get_vel_x in SPH code)
+    vx = (0.5*(vx2 - vx1)
+          * (np.tanh((y - 0.25) / Dy) - np.tanh((y - 0.75) / Dy) - 1.0)
+          + vx2)
+
+    # 2-mode vy perturbation (matches sin(4*pi*x) in SPH code)
+    vy = A0 * np.sin(4 * np.pi * x)
+
+    dustrho = gasrho * dust_to_gas
+
+    fields = [gasrho, vx]
+    if dims >= 2: fields += [vy]
+    if dims == 3: fields += [ones * 0]
+    fields += [ones * P]
+    fields += [dustrho, vx]       # dust comoving with gas
+    if dims >= 2: fields += [vy]
+    if dims == 3: fields += [ones * 0]
+
+    fields += [ones * 1e-8, zeros, ones * 1e-8]
+
+    write_ic(f"{folder}/DUSTYKH/kh_{dims}D_ptc.inp", fields)

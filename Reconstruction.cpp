@@ -88,7 +88,6 @@ void compute_slopes(std::vector<Cell> &c, Params p, const Grid& g)
 
 void reconstruct_cell_pair(Cell &Left, Cell &Right, int sign)
 {
-    double rho_min = 1e-8;
     for (size_t s = 0; s < Left.U.size(); ++s)
     {
         for (size_t var = 0; var < Left.U[s].size(); ++var)
@@ -96,8 +95,6 @@ void reconstruct_cell_pair(Cell &Left, Cell &Right, int sign)
             Left.U[s][var]  += Left.dU[s][var]  * sign;
             Right.U[s][var] -= Right.dU[s][var] * sign;
         }
-        if (Left.U[s][idx.rho]  < rho_min) Left.U[s][idx.rho]  = rho_min;
-        if (Right.U[s][idx.rho] < rho_min) Right.U[s][idx.rho] = rho_min;
     }
 
     Left.get_W_from_U();

@@ -65,15 +65,28 @@ void update_variables(std::vector<Cell> &c, Params p, const Grid& g, double dt)
     {
         int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
 
-        for (size_t s = 0; s < c[flat].U.size(); ++s)
-        for (size_t var = 0; var < c[flat].U[s].size(); ++var)
-        {
-            c[flat].U[s][var] += dt / p.dx * (c[flat].FL[s][var] - c[flat].FR[s][var]);
-            if(p.N_dims >= 2) c[flat].U[s][var] += dt / p.dy * (c[flat].FLy[s][var] - c[flat].FRy[s][var]);
-            if(p.N_dims == 3) c[flat].U[s][var] += dt / p.dz * (c[flat].FLz[s][var] - c[flat].FRz[s][var]);
+        for (size_t s = 0; s < c[flat].U.size(); ++s){
+            for (size_t var = 0; var < c[flat].U[s].size(); ++var)
+            {
+                if(s > 0){
+                    c[flat].U[s][var] += dt / p.dx * (c[flat].FL[s][var] - c[flat].FR[s][var]);
+                    if(p.N_dims >= 2) c[flat].U[s][var] += dt / p.dy * (c[flat].FLy[s][var] - c[flat].FRy[s][var]);
+                    if(p.N_dims == 3) c[flat].U[s][var] += dt / p.dz * (c[flat].FLz[s][var] - c[flat].FRz[s][var]);
+                }
+            }
         }
-
         c[flat].get_W_from_U();
+
+        for (size_t s = 0; s < c[flat].U.size(); ++s){
+            if(c[flat].W[s][idx.rho] < 1e-8) c[flat].W[s][idx.rho] = 1e-8;
+            if(p.PTC == 1 && s > 0){
+                if(c[flat].W[s][idx.s11] < 1e-8) c[flat].W[s][idx.s11] = 1e-8;
+                if(p.N_dims >= 2){
+                    if(c[flat].W[s][idx.s22] < 1e-8) c[flat].W[s][idx.s22] = 1e-8;
+                }
+            }
+        }
+        c[flat].get_U_from_W();
     }
 }
 

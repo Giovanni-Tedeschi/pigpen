@@ -200,4 +200,58 @@ void apply_boundary_conditions(std::vector<Cell> &c, Params p, const Grid& g)
             }
         }
     }
+
+    // INJECT DUST (unchanged)
+    for (int k = p.N_ghost; k < g.Nz + p.N_ghost; ++k)
+    for (int j = p.N_ghost; j < g.Ny + p.N_ghost; ++j)
+    {
+        double inject_y1 = 0.5;
+        double inject_y2 = 1.5;
+        double inject_half_width = 0.11;
+        double inject_rho = 1.0;
+        double inject_vx = 0.2;
+        double inject_vy = 0.0;
+
+        const int ref = g.flat_idx(p.N_ghost, j, k);
+        const double y = c[ref].y_center;
+
+        const bool in_jet =
+            (std::abs(y - inject_y1) < inject_half_width) ||
+            (std::abs(y - inject_y2) < inject_half_width);
+
+        for (int i = 0; i < p.N_ghost; ++i)
+            {
+                const int flat = g.flat_idx(i, j, k);
+                for (int s = 1; s <= p.N_dust; ++s)
+                {
+                    if (in_jet){
+                        c[flat].U[s][idx.rho] = inject_rho;
+                        c[flat].U[s][idx.vx]  = inject_rho * inject_vx;
+                        if (p.N_dims >= 2) c[flat].U[s][idx.vy] = inject_rho * inject_vy;
+
+                        if (p.PTC == 1)
+                        {
+                            c[flat].U[s][idx.s11] = inject_rho * (1e-8 + pow(inject_vx, 2));
+                            if (p.N_dims >= 2)
+                            {
+                                c[flat].U[s][idx.s12] = inject_rho * (inject_vx * inject_vy);
+                                c[flat].U[s][idx.s22] = inject_rho * (1e-8 + pow(inject_vy, 2));
+                            }
+                        }
+                    }else{
+                        c[flat].U[s][idx.rho] = 1e-8;
+                        c[flat].U[s][idx.vx]  = 0.0;
+                        c[flat].U[s][idx.vy]  = 0.0;
+                        if (p.PTC == 1)
+                        {
+                            c[flat].U[s][idx.s11] = 1e-8 * 1e-8;
+                            c[flat].U[s][idx.s12] = 0.0;
+                            c[flat].U[s][idx.s22] = 1e-8 * 1e-8;
+                        }
+                    }
+                }
+                
+                c[flat].get_W_from_U();
+            }
+    }
 }
