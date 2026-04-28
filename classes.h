@@ -22,6 +22,8 @@ class Params{
         double dz;
         double const_dt;
         double BC; // Global BC type (0: outflow, 1: periodic, 2: reflecting)
+        int inject_dust;
+        int freeze_gas;
 
         // Per-face BCs (-1 => fallback to BC)
         int BC_xmin = -1;

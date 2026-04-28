@@ -122,6 +122,8 @@ Params read_param(std::string fname)
     p.g0 = configData.count("g0") ? stof(configData["g0"]) : 0.0;
     p.Omega0 = configData.count("Omega0") ? stof(configData["Omega0"]) : 0.0;
     p.q = configData.count("q") ? stof(configData["q"]) : 0.0;
+    p.freeze_gas = configData.count("freeze_gas") ? stoi(configData["freeze_gas"]) : 0;
+    p.inject_dust = configData.count("inject_dust") ? stoi(configData["inject_dust"]) : 0;
 
     // Optional per-face BC overrides
     p.BC_xmin = read_face_bc(configData, "BC_xmin", "BoundaryCondition_xmin");

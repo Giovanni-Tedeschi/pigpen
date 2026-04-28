@@ -182,21 +182,19 @@ void integrate_drag_RK(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 
         RK_K(c[flat], p, dt, gamma1, gamma2, beta1, beta2);
 
-        //c[flat].U[0][idx.vx] += b * dt * c[flat].K1[0][idx.vx] + (1.-b) * dt * c[flat].K2[0][idx.vx];
-        for (int s = 1; s <= p.N_dust; s++)
+        int smin = (p.freeze_gas == 1) ? 1 : 0; // if freeze_gas, skip gas (s=0) when updating U
+        for (int s = smin; s <= p.N_dust; s++)
             c[flat].U[s][idx.vx] += b * dt * c[flat].K1[s][idx.vx] + (1.-b) * dt * c[flat].K2[s][idx.vx];
 
         if (p.N_dims >= 2)
         {
-            //c[flat].U[0][idx.vy] += b * dt * c[flat].K1[0][idx.vy] + (1.-b) * dt * c[flat].K2[0][idx.vy];
-            for (int s = 1; s <= p.N_dust; s++)
+            for (int s = smin; s <= p.N_dust; s++)
                 c[flat].U[s][idx.vy] += b * dt * c[flat].K1[s][idx.vy] + (1.-b) * dt * c[flat].K2[s][idx.vy];
         }
 
         if (p.N_dims == 3)
         {
-            c[flat].U[0][idx.vz] += b * dt * c[flat].K1[0][idx.vz] + (1.-b) * dt * c[flat].K2[0][idx.vz];
-            for (int s = 1; s <= p.N_dust; s++)
+            for (int s = smin; s <= p.N_dust; s++)
                 c[flat].U[s][idx.vz] += b * dt * c[flat].K1[s][idx.vz] + (1.-b) * dt * c[flat].K2[s][idx.vz];
         }
 
