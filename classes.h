@@ -53,6 +53,10 @@ class Params{
         std::vector<double> K;
         std::string input_file;
         std::string output_dir;
+
+
+        // Coagulation and Fragmentation parameters
+        
 };
 
 class Vars{

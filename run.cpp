@@ -182,9 +182,9 @@ int main(int argc, char *argv[])
 
     Grid g;  // will be fully built inside read_ic once N_cells is known
 
-    std::vector<Cell> c = read_ic(p, g);
+    std::vector<Cell> c = read_ic_hdf5(p, g);
 
-    write_output(c, p, v, g);
+    write_output_hdf5(c, p, v, g);
 
     while (v.t < p.t_max)
     {
@@ -196,6 +196,6 @@ int main(int argc, char *argv[])
 
         v.t += v.dt;
 
-        write_output(c, p, v, g);
+        write_output_hdf5(c, p, v, g);
     }
 }

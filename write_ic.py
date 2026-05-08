@@ -1,7 +1,8 @@
 import numpy as np
+import h5py 
 
 # ============================================================
-# Generic helper
+# Generic helpers
 # ============================================================
 
 def write_ic(filepath, fields):
@@ -19,6 +20,51 @@ def write_ic(filepath, fields):
     """
     W = np.array([f.ravel(order='C') for f in fields]).T  # (N_total, N_vars)
     np.savetxt(filepath, W)
+
+
+def write_ic_hdf5(filepath, fields, dims=1, N_dust=1, has_ptc=False, K=None):
+    """
+    Write an IC file in HDF5 format with auto-generated field names.
+
+    Parameters
+    ----------
+    filepath  : str, should end in .h5
+    fields    : list of np.ndarray in standard variable order
+    dims      : number of spatial dimensions
+    N_dust    : number of dust species
+    has_ptc   : whether PTC stress tensor fields are included
+    K         : list of drag coefficients, one per dust species (length N_dust)
+    """
+    if K is None:
+        K = [0.0] * N_dust
+    assert len(K) == N_dust, f"K must have length N_dust={N_dust}, got {len(K)}"
+
+    # --- auto-build var_names ---
+    var_names = ['gas_rho', 'gas_vx']
+    if dims >= 2: var_names += ['gas_vy']
+    if dims == 3: var_names += ['gas_vz']
+    var_names += ['gas_P']
+    for s in range(1, N_dust + 1):
+        var_names += [f'dust_rho_{s}', f'dust_vx_{s}']
+        if dims >= 2: var_names += [f'dust_vy_{s}']
+        if dims == 3: var_names += [f'dust_vz_{s}']
+        if has_ptc:
+            var_names += [f'dust_s11_{s}', f'dust_s12_{s}', f'dust_s22_{s}']
+
+    assert len(var_names) == len(fields), \
+        f"Field count mismatch: {len(fields)} arrays but {len(var_names)} names.\n" \
+        f"Expected: {var_names}"
+
+    with h5py.File(filepath, 'w') as f:
+        grp = f.create_group('fields')
+        for name, arr in zip(var_names, fields):
+            grp.create_dataset(name, data=np.asarray(arr, dtype=np.float64).ravel(order='C'))
+
+        # --- drag coefficients, one per dust species ---
+        drag = f.create_group('drag')
+        for s in range(1, N_dust + 1):
+            drag.attrs[f'K_{s}'] = float(K[s-1])
+
 
 
 def make_grid(N, dims=1):
@@ -54,6 +100,31 @@ def make_grid(N, dims=1):
         return xx, yy, zz
 
 
+def _build_fields(x, dims, gas, dust_list, ptc_list=None):
+    """
+    Generic field list builder.
+
+    Parameters
+    ----------
+    x         : x coordinate array (used only for shape via ones_like)
+    dims      : number of spatial dimensions
+    gas       : dict with keys 'rho', 'vx', 'vy', 'vz', 'P'
+    dust_list : list of dicts, each with keys 'rho', 'vx', 'vy', 'vz'
+    ptc_list  : list of dicts with keys 's11', 's12', 's22' (one per dust species, optional)
+    """
+    fields = [gas['rho'], gas['vx']]
+    if dims >= 2: fields += [gas['vy']]
+    if dims == 3: fields += [gas['vz']]
+    fields += [gas['P']]
+    for i, d in enumerate(dust_list):
+        fields += [d['rho'], d['vx']]
+        if dims >= 2: fields += [d['vy']]
+        if dims == 3: fields += [d['vz']]
+        if ptc_list is not None:
+            fields += [ptc_list[i]['s11'], ptc_list[i]['s12'], ptc_list[i]['s22']]
+    return fields
+
+
 # ============================================================
 # DUSTY BOX
 # ============================================================
@@ -61,35 +132,25 @@ def make_grid(N, dims=1):
 def write_box_A(N, folder, dims=1):
     x, y, z = make_grid(N, dims)
     ones = np.ones_like(x)
-    fields = [ones*1, ones*1]                              # rho, vx
-    if dims >= 2: fields += [ones*0]                       # vy
-    if dims == 3: fields += [ones*0]                       # vz
-    fields += [ones*1.0]                                   # P
-    fields += [ones*1, ones*2]                             # dust1 rho, vx
-    if dims >= 2: fields += [ones*0]                       # dust1 vy
-    if dims == 3: fields += [ones*0]                       # dust1 vz
-    fields += [ones*1, ones*0.5]                           # dust2 rho, vx
-    if dims >= 2: fields += [ones*0]                       # dust2 vy
-    if dims == 3: fields += [ones*0]                       # dust2 vz
-    write_ic(f"{folder}/DUSTYBOX/box_A_{dims}D.inp", fields)
+    gas = {'rho': ones,   'vx': ones,     'vy': ones*0, 'vz': ones*0, 'P': ones}
+    d1  = {'rho': ones,   'vx': ones*2,   'vy': ones*0, 'vz': ones*0}
+    d2  = {'rho': ones,   'vx': ones*0.5, 'vy': ones*0, 'vz': ones*0}
+    fields = _build_fields(x, dims, gas, [d1, d2])
+    write_ic(f"{folder}/DUSTYBOX/box_A.inp", fields)
+    write_ic_hdf5(f"{folder}/DUSTYBOX/box_A.h5", fields, dims=dims, N_dust=2, K=[0.5, 1.0])
 
 def write_box_B(N, folder, dims=1):
-    write_box_A(N, folder, dims)   # same IC as A for now
+    write_box_A(N, folder, dims)
 
 def write_box_C(N, folder, dims=1):
     x, y, z = make_grid(N, dims)
     ones = np.ones_like(x)
-    fields = [ones*1, ones*1]
-    if dims >= 2: fields += [ones*0]
-    if dims == 3: fields += [ones*0]
-    fields += [ones*1.0]
-    fields += [ones*10,  ones*2]
-    if dims >= 2: fields += [ones*0]
-    if dims == 3: fields += [ones*0]
-    fields += [ones*100, ones*0.5]
-    if dims >= 2: fields += [ones*0]
-    if dims == 3: fields += [ones*0]
-    write_ic(f"{folder}/DUSTYBOX/box_C_{dims}D.inp", fields)
+    gas = {'rho': ones,    'vx': ones,     'vy': ones*0, 'vz': ones*0, 'P': ones}
+    d1  = {'rho': ones*10, 'vx': ones*2,   'vy': ones*0, 'vz': ones*0}
+    d2  = {'rho': ones*100,'vx': ones*0.5, 'vy': ones*0, 'vz': ones*0}
+    fields = _build_fields(x, dims, gas, [d1, d2])
+    write_ic(f"{folder}/DUSTYBOX/box_C.inp", fields)
+    write_ic_hdf5(f"{folder}/DUSTYBOX/box_C.h5", fields, dims=dims, N_dust=2, K=[5.0, 100.0])
 
 
 # ============================================================
@@ -105,11 +166,6 @@ def _wave_phase(x, y, z, direction):
 
 
 def _make_wave_A_fields(x, y, z, direction, dims):
-    """
-    Constructs field list for SOUNDWAVE_A travelling in `direction`.
-    Variable ordering: [rho, vx, (vy), (vz), P, dust_rho, dust_vx, (dust_vy), (dust_vz)]
-    The wave velocity amplitude is placed in the component matching `direction`.
-    """
     A = 1e-4
     cs = 1.0
     GAMMA = 1.00001
@@ -123,31 +179,19 @@ def _make_wave_A_fields(x, y, z, direction, dims):
     dustrho_1 = ones * 2.24 + A * (0.165251 * np.cos(phi) + 1.247801 * np.sin(phi))
     dvel_wave = A * (-0.221645 * np.cos(phi) - 0.368534 * np.sin(phi))
 
-    # Gas fields
     vx = vel_wave if direction == 'x' else ones*0
     vy = vel_wave if direction == 'y' else ones*0
     vz = vel_wave if direction == 'z' else ones*0
-    fields = [gasrho, vx]
-    if dims >= 2: fields += [vy]
-    if dims == 3: fields += [vz]
-    fields += [P]
-
-    # Dust fields
     dvx = dvel_wave if direction == 'x' else ones*0
     dvy = dvel_wave if direction == 'y' else ones*0
     dvz = dvel_wave if direction == 'z' else ones*0
-    fields += [dustrho_1, dvx]
-    if dims >= 2: fields += [dvy]
-    if dims == 3: fields += [dvz]
 
-    return fields
+    gas = {'rho': gasrho,   'vx': vx, 'vy': vy, 'vz': vz, 'P': P}
+    d1  = {'rho': dustrho_1,'vx': dvx,'vy': dvy,'vz': dvz}
+    return _build_fields(x, dims, gas, [d1])
 
 
 def _make_wave_B_fields(x, y, z, direction, dims):
-    """
-    Constructs field list for SOUNDWAVE_B travelling in `direction`.
-    4 dust species.
-    """
     A = 1e-4
     cs = 1.0
     GAMMA = 1.00001
@@ -172,40 +216,40 @@ def _make_wave_B_fields(x, y, z, direction, dims):
     vx = vel_wave if direction == 'x' else ones*0
     vy = vel_wave if direction == 'y' else ones*0
     vz = vel_wave if direction == 'z' else ones*0
-    fields = [gasrho, vx]
-    if dims >= 2: fields += [vy]
-    if dims == 3: fields += [vz]
-    fields += [P]
+    gas = {'rho': gasrho, 'vx': vx, 'vy': vy, 'vz': vz, 'P': P}
 
+    dust_list = []
     for rho0, drho, dvel in dust_data:
         dvx = dvel if direction == 'x' else ones*0
         dvy = dvel if direction == 'y' else ones*0
         dvz = dvel if direction == 'z' else ones*0
-        fields += [ones * rho0 + drho, dvx]
-        if dims >= 2: fields += [dvy]
-        if dims == 3: fields += [dvz]
+        dust_list.append({'rho': ones*rho0 + drho, 'vx': dvx, 'vy': dvy, 'vz': dvz})
 
-    return fields
+    return _build_fields(x, dims, gas, dust_list)
 
 
 # ============================================================
-# SOUNDWAVE_A  (1D, 2D, 3D  x  x/y/z direction)
+# SOUNDWAVE_A
 # ============================================================
 
 def write_wave_A(N, folder, dims=1, direction='x'):
     x, y, z = make_grid(N, dims)
     fields = _make_wave_A_fields(x, y, z, direction, dims)
     write_ic(f"{folder}/DUSTYWAVE/wave_A_{dims}D_{direction}.inp", fields)
+    write_ic_hdf5(f"{folder}/DUSTYWAVE/wave_A_{dims}D_{direction}.h5",
+                  fields, dims=dims, N_dust=1, K=[5.6])
 
 
 # ============================================================
-# SOUNDWAVE_B  (1D, 2D, 3D  x  x/y/z direction)
+# SOUNDWAVE_B
 # ============================================================
 
 def write_wave_B(N, folder, dims=1, direction='x'):
     x, y, z = make_grid(N, dims)
     fields = _make_wave_B_fields(x, y, z, direction, dims)
     write_ic(f"{folder}/DUSTYWAVE/wave_B_{dims}D_{direction}.inp", fields)
+    write_ic_hdf5(f"{folder}/DUSTYWAVE/wave_B_{dims}D_{direction}.h5",
+                  fields, dims=dims, N_dust=4, K=[1.0, 1.083038, 0.789959, 0.5])
 
 
 # ============================================================
@@ -217,57 +261,59 @@ def write_ext_force(N, folder, dims=1):
     ones = np.ones_like(x)
     cs = 1.0
     GAMMA = 1.00001
-    P = ones * cs**2 / GAMMA
-    fields = [ones*1.0, ones*2.0]
-    if dims >= 2: fields += [ones*0]
-    if dims == 3: fields += [ones*0]
-    fields += [P]
-    fields += [ones*0.1, ones*0.1]
-    if dims >= 2: fields += [ones*0]
-    if dims == 3: fields += [ones*0]
-    fields += [ones*0.1, ones*-0.5]
-    if dims >= 2: fields += [ones*0]
-    if dims == 3: fields += [ones*0]
-    write_ic(f"{folder}/EXT_FORCE/ext_force_{dims}D.inp", fields)
+    gas = {'rho': ones,     'vx': ones*2.0,  'vy': ones*0, 'vz': ones*0, 'P': ones*cs**2/GAMMA}
+    d1  = {'rho': ones*0.1, 'vx': ones*0.1,  'vy': ones*0, 'vz': ones*0}
+    d2  = {'rho': ones*0.1, 'vx': ones*-0.5, 'vy': ones*0, 'vz': ones*0}
+    fields = _build_fields(x, dims, gas, [d1, d2])
+    write_ic(f"{folder}/EXT_FORCE/ext_force.inp", fields)
+    write_ic_hdf5(f"{folder}/EXT_FORCE/ext_force.h5", fields, dims=dims, N_dust=2, K=[0.1, 0.075])
 
 
 # ============================================================
-# SHOCK_B  (1D only -- shocks are inherently 1D)
+# SHOCK_B
 # ============================================================
 
 def write_shock_B(N, folder):
     NL = int(N * 0.1)
     NR = N - NL
     def lr(vL, vR): return np.concatenate([np.ones(NL)*vL, np.ones(NR)*vR])
-    gasrho = lr(1, 16);  gasvel = lr(2.0, 0.125);  P = lr(1, 16)
-    fields = [gasrho, gasvel, P]
-    for _ in range(3):
-        fields += [lr(1, 16), lr(2.0, 0.125)]
+    ones = np.ones(N)
+    gas = {'rho': lr(1,16), 'vx': lr(2.0,0.125), 'vy': ones*0, 'vz': ones*0, 'P': lr(1,16)}
+    dust_list = [{'rho': lr(1,16), 'vx': lr(2.0,0.125), 'vy': ones*0, 'vz': ones*0}
+                 for _ in range(3)]
+    fields = _build_fields(ones, 1, gas, dust_list)
     write_ic(f"{folder}/DUSTYSHOCK/shock_B.inp", fields)
+    write_ic_hdf5(f"{folder}/DUSTYSHOCK/shock_B.h5", fields, dims=1, N_dust=3, K=[1.0, 3.0, 5.0])
+
 
 # ============================================================
-# SHOCK Particle Crossing Trajectory (PTC)
+# SHOCK PTC
 # ============================================================
 
 def write_shock_PTC(N, folder):
     NL = int(N * 0.5)
     NR = N - NL
     def lr(vL, vR): return np.concatenate([np.ones(NL)*vL, np.ones(NR)*vR])
-    gasrho = lr(1, 1);  gasvelx = lr(0.0, 0.0); gasvely = lr(0.0, 0.0);  P = lr(1, 1)
-    #dustrho = lr(1, 0.125); dustvelx = lr(0.0, 0.0); dustvely = lr(0.0, 0.0); dusts11 = lr(2.0, 0.2/0.125); dusts12 = lr(0.05, 0.1/0.125); dusts22 = lr(0.6, 0.2/0.125)
-    dustrho = lr(1, 0.125); dustvelx = lr(0.0, 0.0); dustvely = lr(0.0, 0.0); dusts11 = lr(0.6, 0.2/0.125); dusts12 = lr(0.05, 0.1/0.125); dusts22 = lr(2.0, 0.2/0.125)
-    fields = [gasrho, gasvelx, gasvely, P, dustrho, dustvelx, dustvely, dusts11, dusts12, dusts22]
+    ones = np.ones(N)
+    gas = {'rho': lr(1,1), 'vx': lr(0,0), 'vy': lr(0,0), 'vz': ones*0, 'P': lr(1,1)}
+    d1  = {'rho': lr(1,0.125), 'vx': lr(0,0), 'vy': lr(0,0), 'vz': ones*0}
+    ptc = [{'s11': lr(0.6, 0.2/0.125), 's12': lr(0.05, 0.1/0.125), 's22': lr(2.0, 0.2/0.125)}]
+    fields = _build_fields(ones, 2, gas, [d1], ptc_list=ptc)
     write_ic(f"{folder}/PTC_SHOCK/shock_PTC.inp", fields)
-
+    write_ic_hdf5(f"{folder}/PTC_SHOCK/shock_PTC.h5", fields, dims=2, N_dust=1, has_ptc=True, K=[0.0])
 
 def write_shock_PTC_vacuum(N, folder):
     NL = int(N * 0.5)
     NR = N - NL
     def lr(vL, vR): return np.concatenate([np.ones(NL)*vL, np.ones(NR)*vR])
-    gasrho = lr(1, 1);  gasvelx = lr(0.0, 0.0); gasvely = lr(0.0, 0.0);  P = lr(1, 1)
-    dustrho = lr(1, 0.0); dustvelx = lr(0.0, 0.0); dustvely = lr(0.0, 0.0); dusts11 = lr(2.0, 0.0); dusts12 = lr(0.05, 0.0); dusts22 = lr(0.6, 0.0)
-    fields = [gasrho, gasvelx, gasvely, P, dustrho, dustvelx, dustvely, dusts11, dusts12, dusts22]
+    ones = np.ones(N)
+    gas = {'rho': lr(1,1), 'vx': lr(0,0), 'vy': lr(0,0), 'vz': ones*0, 'P': lr(1,1)}
+    d1  = {'rho': lr(1,0), 'vx': lr(0,0), 'vy': lr(0,0), 'vz': ones*0}
+    ptc = [{'s11': lr(2.0,0), 's12': lr(0.05,0), 's22': lr(0.6,0)}]
+    fields = _build_fields(ones, 2, gas, [d1], ptc_list=ptc)
     write_ic(f"{folder}/PTC_SHOCK/shock_PTC_vacuum.inp", fields)
+    write_ic_hdf5(f"{folder}/PTC_SHOCK/shock_PTC_vacuum.h5", fields, dims=2, N_dust=1, has_ptc=True, K=[0.0])
+
 
 # ============================================================
 # STEADY_STATE_DRIFT  (2D, includes ghosts)
@@ -292,7 +338,7 @@ def write_steady_state_drift(N, folder):
 
     L = 1
     dx = L / N
-    x = np.arange(dx*(0.5 - N_ghost), L + dx*N_ghost, dx)  # includes ghosts
+    x = np.arange(dx*(0.5 - N_ghost), L + dx*N_ghost, dx)
 
     ones = np.ones_like(x)
     gasrho   = ones
@@ -303,8 +349,11 @@ def write_steady_state_drift(N, folder):
     dustvelx = (gasvelx + 2*ts*(gasvely + q*omega0*x)) / (1. + k2tilde * ts**2)
     dustvely = ((gasvely + q*omega0*x) - (2.-q)*ts*gasvelx) / (1. + k2tilde * ts**2) - q*omega0*x
 
-    fields = [gasrho, gasvelx, gasvely, P, dustrho, dustvelx, dustvely]
+    gas = {'rho': gasrho, 'vx': gasvelx, 'vy': gasvely, 'vz': ones*0, 'P': P}
+    d1  = {'rho': dustrho,'vx': dustvelx,'vy': dustvely,'vz': ones*0}
+    fields = _build_fields(x, 2, gas, [d1])
     write_ic(f"{folder}/STEADY_STATE_DRIFT/linA.inp", fields)
+    write_ic_hdf5(f"{folder}/STEADY_STATE_DRIFT/linA.h5", fields, dims=2, N_dust=1, K=[30.0])
 
 
 # ============================================================
@@ -312,94 +361,74 @@ def write_steady_state_drift(N, folder):
 # ============================================================
 
 def write_kelvin_helmholtz(N, folder, dims=2, dust_to_gas=0.01):
-    """
-    Kelvin-Helmholtz instability IC matching the SPH setup:
-    - Smooth tanh density and velocity profiles at y=0.25 and y=0.75
-    - Two sinusoidal modes (sin(4*pi*x)) for vy perturbation
-    - Dust comoving with gas, dust-to-gas ratio = dust_to_gas
-    dims must be >= 2.
-    """
     assert dims >= 2, "KH instability requires at least 2D"
-
     x, y, z = make_grid(N, dims)
     ones = np.ones_like(x)
 
     rho1, rho2 = 1.0, 2.0
-    Dy   = 0.025          # shear layer width (matches SPH Dy)
+    Dy   = 0.025
     Drho = 0.5*(rho2-rho1)
     vx1, vx2 = -0.5, 0.5
-    A0 = 0.01             # vy perturbation amplitude
-    P  = 2.5              # uniform pressure
+    A0 = 0.01
+    P  = 2.5
 
-    # Smooth density profile (matches rho_KH in SPH code)
-    gasrho = (rho1
-              + Drho * (np.tanh((y - 0.25) / Dy) - np.tanh((y - 0.75) / Dy) - 1.0))
-
-    # Smooth velocity profile (matches get_vel_x in SPH code)
-    vx = (0.5*(vx2 - vx1)
-          * (np.tanh((y - 0.25) / Dy) - np.tanh((y - 0.75) / Dy) - 1.0)
-          + vx2)
-
-    # 2-mode vy perturbation (matches sin(4*pi*x) in SPH code)
+    gasrho = rho1 + Drho * (np.tanh((y-0.25)/Dy) - np.tanh((y-0.75)/Dy) - 1.0)
+    vx = 0.5*(vx2-vx1) * (np.tanh((y-0.25)/Dy) - np.tanh((y-0.75)/Dy) - 1.0) + vx2
     vy = A0 * np.sin(4 * np.pi * x)
 
-    dustrho = gasrho * dust_to_gas
-
-    fields = [gasrho, vx]
-    if dims >= 2: fields += [vy]
-    if dims == 3: fields += [ones * 0]
-    fields += [ones * P]
-    fields += [dustrho, vx]       # dust comoving with gas
-    if dims >= 2: fields += [vy]
-    if dims == 3: fields += [ones * 0]
-
+    gas = {'rho': gasrho,           'vx': vx, 'vy': vy, 'vz': ones*0, 'P': ones*P}
+    d1  = {'rho': gasrho*dust_to_gas,'vx': vx, 'vy': vy, 'vz': ones*0}
+    fields = _build_fields(x, dims, gas, [d1])
     write_ic(f"{folder}/DUSTYKH/kh_{dims}D.inp", fields)
-
+    write_ic_hdf5(f"{folder}/DUSTYKH/kh_{dims}D.h5", fields, dims=dims, N_dust=1, K=[1.0])
 
 
 def write_kelvin_helmholtz_PTC(N, folder, dims=2, dust_to_gas=0.01):
-    """
-    Kelvin-Helmholtz instability IC matching the SPH setup:
-    - Smooth tanh density and velocity profiles at y=0.25 and y=0.75
-    - Two sinusoidal modes (sin(4*pi*x)) for vy perturbation
-    - Dust comoving with gas, dust-to-gas ratio = dust_to_gas
-    dims must be >= 2.
-    """
     assert dims >= 2, "KH instability requires at least 2D"
-
     x, y, z = make_grid(N, dims)
     ones = np.ones_like(x)
     zeros = np.zeros_like(x)
 
     rho1, rho2 = 1.0, 2.0
-    Dy   = 0.025          # shear layer width (matches SPH Dy)
+    Dy   = 0.025
     Drho = 0.5*(rho2-rho1)
     vx1, vx2 = -0.5, 0.5
-    A0 = 0.01             # vy perturbation amplitude
-    P  = 2.5              # uniform pressure
+    A0 = 0.01
+    P  = 2.5
 
-    # Smooth density profile (matches rho_KH in SPH code)
-    gasrho = (rho1
-              + Drho * (np.tanh((y - 0.25) / Dy) - np.tanh((y - 0.75) / Dy) - 1.0))
-
-    # Smooth velocity profile (matches get_vel_x in SPH code)
-    vx = (0.5*(vx2 - vx1)
-          * (np.tanh((y - 0.25) / Dy) - np.tanh((y - 0.75) / Dy) - 1.0)
-          + vx2)
-
-    # 2-mode vy perturbation (matches sin(4*pi*x) in SPH code)
+    gasrho = rho1 + Drho * (np.tanh((y-0.25)/Dy) - np.tanh((y-0.75)/Dy) - 1.0)
+    vx = 0.5*(vx2-vx1) * (np.tanh((y-0.25)/Dy) - np.tanh((y-0.75)/Dy) - 1.0) + vx2
     vy = A0 * np.sin(4 * np.pi * x)
 
-    dustrho = gasrho * dust_to_gas
-
-    fields = [gasrho, vx]
-    if dims >= 2: fields += [vy]
-    if dims == 3: fields += [ones * 0]
-    fields += [ones * P]
-    fields += [dustrho, vx]       # dust comoving with gas
-    if dims >= 2: fields += [vy]
-    if dims == 3: fields += [ones * 0]
-
-    fields += [ones * 1e-8, zeros, ones * 1e-8]
-
+    gas = {'rho': gasrho,            'vx': vx, 'vy': vy, 'vz': ones*0, 'P': ones*P}
+    d1  = {'rho': gasrho*dust_to_gas,'vx': vx, 'vy': vy, 'vz': ones*0}
+    ptc = [{'s11': ones*1e-8, 's12': zeros, 's22': ones*1e-8}]
+    fields = _build_fields(x, dims, gas, [d1], ptc_list=ptc)
     write_ic(f"{folder}/DUSTYKH/kh_{dims}D_ptc.inp", fields)
+    write_ic_hdf5(f"{folder}/DUSTYKH/kh_{dims}D_ptc.h5", fields, dims=dims, N_dust=1, has_ptc=True, K=[1.0])
+
+
+# ============================================================
+# JET
+# ============================================================
+
+def write_jet(folder):
+    N = (250, 100)
+    dims = 2
+    strain = 1
+    Lx, Ly = 6, 2
+
+    x, y, _ = make_grid(N, dims) * np.array([Lx, Ly, 0])[:,np.newaxis, np.newaxis]
+    ones  = np.ones_like(x)
+    zeros = np.zeros_like(x)
+
+    gas = {'rho': ones, 'vx': ones*0.2, 'vy': (1-y)*strain, 'vz': zeros, 'P': ones}
+    d1  = {'rho': ones*1e-8, 'vx': ones*0.2, 'vy': zeros, 'vz': zeros}
+    fields = _build_fields(x, dims, gas, [d1])
+    write_ic(f"{folder}/JET/jet.inp", fields)
+    write_ic_hdf5(f"{folder}/JET/jet.h5", fields, dims=dims, N_dust=1, K=[1.0])
+
+    ptc = [{'s11': ones*1e-8, 's12': ones*1e-8, 's22': ones*1e-8}]
+    fields_ptc = _build_fields(x, dims, gas, [d1], ptc_list=ptc)
+    write_ic(f"{folder}/JET/jet_ptc.inp", fields_ptc)
+    write_ic_hdf5(f"{folder}/JET/jet_ptc.h5", fields_ptc, dims=dims, N_dust=1, has_ptc=True, K=[1.0])
