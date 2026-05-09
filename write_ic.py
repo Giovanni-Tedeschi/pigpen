@@ -21,8 +21,15 @@ def write_ic(filepath, fields):
     W = np.array([f.ravel(order='C') for f in fields]).T  # (N_total, N_vars)
     np.savetxt(filepath, W)
 
+def bins_per_decade_from_grid(mass_grid):
+    """
+    Infer bins_per_decade from a log-spaced mass grid.
+    Uses the ratio between the first two entries: m[1]/m[0] = 10^(1/bpd)
+    """
+    ratio = mass_grid[1] / mass_grid[0]
+    return 1.0 / np.log10(ratio)
 
-def write_ic_hdf5(filepath, fields, dims=1, N_dust=1, has_ptc=False, K=None):
+def write_ic_hdf5(filepath, fields, dims=1, N_dust=1, has_ptc=False, K=None, mass_grid=None):
     """
     Write an IC file in HDF5 format with auto-generated field names.
 
@@ -64,6 +71,13 @@ def write_ic_hdf5(filepath, fields, dims=1, N_dust=1, has_ptc=False, K=None):
         drag = f.create_group('drag')
         for s in range(1, N_dust + 1):
             drag.attrs[f'K_{s}'] = float(K[s-1])
+
+        # mass grid: only m and dm, no rho (that lives in the dust fluid fields)
+        if mass_grid is not None:
+            dm = mass_grid * np.log(10.0) / bins_per_decade_from_grid(mass_grid)
+            coag = f.create_group('coagulation')
+            coag.create_dataset('m',  data=np.asarray(mass_grid, dtype=np.float64))
+            coag.create_dataset('dm', data=np.asarray(dm,        dtype=np.float64))
 
 
 
@@ -432,3 +446,49 @@ def write_jet(folder):
     fields_ptc = _build_fields(x, dims, gas, [d1], ptc_list=ptc)
     write_ic(f"{folder}/JET/jet_ptc.inp", fields_ptc)
     write_ic_hdf5(f"{folder}/JET/jet_ptc.h5", fields_ptc, dims=dims, N_dust=1, has_ptc=True, K=[1.0])
+
+
+
+def _coag_initial_conditions(m_min=1e-12, m_max=1e2, bins_per_decade=7, t0=1e-8):
+    N_m = int(np.log10(m_max / m_min) * bins_per_decade) + 1
+    m   = m_min * 10.0 ** (np.arange(N_m) / bins_per_decade)
+    dm  = m * np.log(10.0) / bins_per_decade
+
+    m0    = m[0]
+    N0loc = 1.0 / m0
+    alpha = 1.0
+    tau0  = 2.0 / (alpha * N0loc * t0)
+
+    # this IS the rho array that goes directly into dust_rho_1 ... dust_rho_Nm
+    rho = (N0loc / m0) * tau0**2 * np.exp(tau0 * (1.0 - m / m0)) * m
+    return m, dm, rho
+
+def write_coagulation_test(N, folder, dims=2, bins_per_decade=7):
+    import os
+    os.makedirs(f"{folder}/COAGULATION", exist_ok=True)
+
+    x, y, z = make_grid(N, dims)
+    ones = np.ones_like(x)
+
+    m, dm, rho_dist = _coag_initial_conditions()
+    N_m = len(m)
+
+    cs    = 1.0
+    GAMMA = 1.4
+    gas = {'rho': ones, 'vx': ones*0, 'vy': ones*0, 'vz': ones*0,
+           'P':   ones * cs**2 / GAMMA}
+
+    # one dust fluid per mass bin, uniform across all cells
+    dust_list = [{'rho': ones * rho_dist[s], 'vx': ones*0, 'vy': ones*0, 'vz': ones*0}
+                 for s in range(N_m)]
+
+    fields = _build_fields(x, dims, gas, dust_list)
+
+    write_ic_hdf5(
+        f"{folder}/COAGULATION/coag_test_{dims}D.h5",
+        fields,
+        dims=dims,
+        N_dust=N_m,
+        K=[0.0] * N_m,   # drag not used in pure coagulation test
+        mass_grid=m,
+    )

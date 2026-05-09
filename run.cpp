@@ -17,7 +17,31 @@
 #include "BoundaryConditions.h"
 #include "indices.h"
 #include "IO.h"
+#include "coagulation.h"
 
+void integrate_coagulation(std::vector<Cell>& c, Params& p, const Grid& g, double dt)
+{
+    if (!p.coagulation) return;
+
+    #pragma omp parallel for collapse(3) schedule(static)
+    for (int k = 0; k < g.Nz; k++)
+    for (int j = 0; j < g.Ny; j++)
+    for (int i = 0; i < g.Nx; i++)
+    {
+        int flat = g.flat_idx(i + p.N_ghost, j + p.N_ghost, k + p.N_ghost);
+
+        std::vector<double> rho(p.N_dust), drhodt(p.N_dust);
+        for (int s = 0; s < p.N_dust; ++s)
+            rho[s] = c[flat].W[s + 1][idx.rho];
+
+        p.coag_kernel.compute_drhodt(p.mg, rho, drhodt);
+
+        for (int s = 0; s < p.N_dust; ++s)
+            c[flat].W[s + 1][idx.rho] = std::max(rho[s] + dt * drhodt[s], 1e-100);
+
+        c[flat].get_U_from_W();
+    }
+}
 
 void integrate_external_force(std::vector<Cell> &c, Params p, const Grid& g, double dt)
 {
@@ -131,7 +155,7 @@ void do_integration_step(std::vector<Cell> &c, Params p, const Grid& g, Vars v)
     if (p.DragIntegrator == 1)
     {
         // DHD
-        integrate_drag_RK(c, p, g, v.dt/2);
+        //integrate_drag_RK(c, p, g, v.dt/2);
 
         save_old_state(c, g);
 
@@ -139,7 +163,7 @@ void do_integration_step(std::vector<Cell> &c, Params p, const Grid& g, Vars v)
         update_variables(c, p, g, v.dt);
         integrate_external_force(c, p, g, v.dt);
 
-        integrate_drag_RK(c, p, g, v.dt/2);
+        //integrate_drag_RK(c, p, g, v.dt/2);
     }
     else if (p.DragIntegrator == 2)
     {
@@ -184,11 +208,19 @@ int main(int argc, char *argv[])
 
     std::vector<Cell> c = read_ic_hdf5(p, g);
 
+    // --- Build coagulation kernel if mass grid was loaded from IC ---
+    if (!p.mg.m.empty()) {
+        p.coagulation = true;
+        p.coag_kernel.build(p.mg);
+    }
+
     write_output_hdf5(c, p, v, g);
 
     while (v.t < p.t_max)
     {
         find_dt(c, p, g, v);
+
+        integrate_coagulation(c, p, g, v.dt);
 
         do_integration_step(c, p, g, v);
 

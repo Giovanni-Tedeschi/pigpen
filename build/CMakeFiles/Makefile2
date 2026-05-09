@@ -81,12 +81,12 @@ clean: CMakeFiles/pigpen.dir/clean
 CMakeFiles/pigpen.dir/all:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/pigpen.dir/build.make CMakeFiles/pigpen.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/pigpen.dir/build.make CMakeFiles/pigpen.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/giovt/Code/pigpen_project/pigpen/build/CMakeFiles --progress-num=1,2,3,4,5,6,7 "Built target pigpen"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/home/giovt/Code/pigpen_project/pigpen/build/CMakeFiles --progress-num=1,2,3,4,5,6,7,8 "Built target pigpen"
 .PHONY : CMakeFiles/pigpen.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/pigpen.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /home/giovt/Code/pigpen_project/pigpen/build/CMakeFiles 7
+	$(CMAKE_COMMAND) -E cmake_progress_start /home/giovt/Code/pigpen_project/pigpen/build/CMakeFiles 8
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/pigpen.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /home/giovt/Code/pigpen_project/pigpen/build/CMakeFiles 0
 .PHONY : CMakeFiles/pigpen.dir/rule

@@ -5,6 +5,7 @@
 #include <cmath>
 #include <sstream>
 #include "indices.h"
+#include "coagulation.h"
 
 
 class Params{
@@ -54,8 +55,10 @@ class Params{
         std::string input_file;
         std::string output_dir;
 
-
-        // Coagulation and Fragmentation parameters
+        // Coagulation kernel (built once at startup)
+        bool coagulation = false;
+        MassGrid  mg;
+        CoagKernel coag_kernel;
         
 };
 
@@ -138,7 +141,7 @@ struct VarArray {
 };
 
 // ── Drop-in replacement for std::vector<VarArray> ────────────────────────────
-static constexpr int MAX_DUST = 8;   // max dust species supported
+static constexpr int MAX_DUST = 128;   // max dust species supported
 
 struct SpeciesArray {
     VarArray data[MAX_DUST + 1] = {};

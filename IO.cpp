@@ -287,16 +287,23 @@ std::vector<Cell> read_ic_hdf5(Params& p, Grid& g)
         drag.openAttribute(key).read(H5::PredType::NATIVE_DOUBLE, &p.K[s-1]);
     }
 
+    // --- read mass grid if present (coagulation) ---
+    if (file.nameExists("coagulation")) {
+        auto m_in  = h5_read_flat(file, "coagulation/m");
+        auto dm_in = h5_read_flat(file, "coagulation/dm");
+        p.mg.build_from_grid(m_in, dm_in);
+    }
+
+
     // --- gas fields ---
     auto gas_rho = h5_read_flat(file, "fields/gas_rho");
     int total_active = (int)gas_rho.size();
 
-    if (p.N_cells < 0)
-        p.N_cells = (p.N_dims == 1) ? total_active
-                  : (p.N_dims == 2) ? (int)round(sqrt((double)total_active))
-                                    : (int)round(cbrt((double)total_active));
-    if (p.N_cells_y < 0) p.N_cells_y = (p.N_dims >= 2) ? p.N_cells : 1;
-    if (p.N_cells_z < 0) p.N_cells_z = (p.N_dims == 3) ? p.N_cells : 1;
+    p.N_cells = (p.N_dims == 1) ? total_active
+                : (p.N_dims == 2) ? (int)round(sqrt((double)total_active))
+                            : (int)round(cbrt((double)total_active));
+    p.N_cells_y = (p.N_dims >= 2) ? p.N_cells : 1;
+    p.N_cells_z = (p.N_dims == 3) ? p.N_cells : 1;
 
     p.dx = p.L  / p.N_cells;
     p.dy = p.Ly / p.N_cells_y;
@@ -487,6 +494,15 @@ void write_output_hdf5(const std::vector<Cell>& c, Params& p, Vars& v, const Gri
         meta.createAttribute("t",      H5::PredType::NATIVE_DOUBLE, scalar_space).write(H5::PredType::NATIVE_DOUBLE, &v.t);
         meta.createAttribute("k_snap", H5::PredType::NATIVE_INT,    scalar_space).write(H5::PredType::NATIVE_INT,    &v.k_snap);
         meta.createAttribute("N_dust", H5::PredType::NATIVE_INT,    scalar_space).write(H5::PredType::NATIVE_INT,    &p.N_dust);
+
+        // Write mass grid if present (coagulation)
+        if (!p.mg.m.empty()) {
+            H5::Group coag = file.createGroup("coagulation");
+            hsize_t n_bins = p.mg.m.size();
+            H5::DataSpace sp_bins(1, &n_bins);
+            coag.createDataSet("m",  H5::PredType::NATIVE_DOUBLE, sp_bins).write(p.mg.m.data(),  H5::PredType::NATIVE_DOUBLE);
+            coag.createDataSet("dm", H5::PredType::NATIVE_DOUBLE, sp_bins).write(p.mg.dm.data(), H5::PredType::NATIVE_DOUBLE);
+        }
 
         v.k_snap += 1;
     }

@@ -9,6 +9,8 @@ file(REMOVE_RECURSE
   "CMakeFiles/pigpen.dir/Reconstruction.cpp.o.d"
   "CMakeFiles/pigpen.dir/RiemannSolvers.cpp.o"
   "CMakeFiles/pigpen.dir/RiemannSolvers.cpp.o.d"
+  "CMakeFiles/pigpen.dir/coagulation.cpp.o"
+  "CMakeFiles/pigpen.dir/coagulation.cpp.o.d"
   "CMakeFiles/pigpen.dir/run.cpp.o"
   "CMakeFiles/pigpen.dir/run.cpp.o.d"
   "pigpen"

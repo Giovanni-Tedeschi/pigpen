@@ -189,8 +189,7 @@ CMakeFiles/pigpen.dir/RiemannSolvers.cpp.o: \
  /usr/include/c++/13/bits/ostream.tcc \
  /usr/include/c++/13/bits/istream.tcc \
  /usr/include/c++/13/bits/sstream.tcc \
- /home/giovt/Code/pigpen_project/pigpen/BoundaryConditions.h \
- /home/giovt/Code/pigpen_project/pigpen/Reconstruction.h \
+ /home/giovt/Code/pigpen_project/pigpen/coagulation.h \
  /usr/include/c++/13/algorithm /usr/include/c++/13/bits/stl_algo.h \
  /usr/include/c++/13/bits/algorithmfwd.h \
  /usr/include/c++/13/bits/stl_heap.h \
@@ -198,4 +197,6 @@ CMakeFiles/pigpen.dir/RiemannSolvers.cpp.o: \
  /usr/include/c++/13/bits/stl_tempbuf.h \
  /usr/include/c++/13/pstl/glue_algorithm_defs.h \
  /usr/include/c++/13/pstl/execution_defs.h \
+ /home/giovt/Code/pigpen_project/pigpen/BoundaryConditions.h \
+ /home/giovt/Code/pigpen_project/pigpen/Reconstruction.h \
  /usr/lib/gcc/x86_64-linux-gnu/13/include/omp.h

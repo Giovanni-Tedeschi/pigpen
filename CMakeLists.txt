@@ -23,6 +23,7 @@ add_executable(pigpen
     DragIntegrators.cpp
     BoundaryConditions.cpp
     Reconstruction.cpp
+    coagulation.cpp
 )
 
 target_include_directories(pigpen PRIVATE ${HDF5_INCLUDE_DIRS})

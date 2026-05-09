@@ -216,6 +216,7 @@ CMakeFiles/pigpen.dir/run.cpp.o: \
  /usr/include/c++/13/bits/erase_if.h \
  /home/giovt/Code/pigpen_project/pigpen/classes.h \
  /home/giovt/Code/pigpen_project/pigpen/indices.h \
+ /home/giovt/Code/pigpen_project/pigpen/coagulation.h \
  /home/giovt/Code/pigpen_project/pigpen/RiemannSolvers.h \
  /home/giovt/Code/pigpen_project/pigpen/DragIntegrators.h \
  /home/giovt/Code/pigpen_project/pigpen/BoundaryConditions.h \

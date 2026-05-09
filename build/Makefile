@@ -249,6 +249,30 @@ RiemannSolvers.cpp.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/pigpen.dir/build.make CMakeFiles/pigpen.dir/RiemannSolvers.cpp.s
 .PHONY : RiemannSolvers.cpp.s
 
+coagulation.o: coagulation.cpp.o
+.PHONY : coagulation.o
+
+# target to build an object file
+coagulation.cpp.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pigpen.dir/build.make CMakeFiles/pigpen.dir/coagulation.cpp.o
+.PHONY : coagulation.cpp.o
+
+coagulation.i: coagulation.cpp.i
+.PHONY : coagulation.i
+
+# target to preprocess a source file
+coagulation.cpp.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pigpen.dir/build.make CMakeFiles/pigpen.dir/coagulation.cpp.i
+.PHONY : coagulation.cpp.i
+
+coagulation.s: coagulation.cpp.s
+.PHONY : coagulation.s
+
+# target to generate assembly for a file
+coagulation.cpp.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/pigpen.dir/build.make CMakeFiles/pigpen.dir/coagulation.cpp.s
+.PHONY : coagulation.cpp.s
+
 run.o: run.cpp.o
 .PHONY : run.o
 
@@ -297,6 +321,9 @@ help:
 	@echo "... RiemannSolvers.o"
 	@echo "... RiemannSolvers.i"
 	@echo "... RiemannSolvers.s"
+	@echo "... coagulation.o"
+	@echo "... coagulation.i"
+	@echo "... coagulation.s"
 	@echo "... run.o"
 	@echo "... run.i"
 	@echo "... run.s"
